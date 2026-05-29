@@ -1,0 +1,24 @@
+Given Processes:
+
+P1: Arrival 0 | CPU 5 | IO 3 | CPU 4
+P2: Arrival 1 | CPU 3 | IO 2 | CPU 2
+P3: Arrival 2 | CPU 2 | IO 1 | CPU 3
+
+SRTF always runs the process with the smallest remaining CPU time.
+
+CPU gantt chart
+[0:1 P1] [1:4 P2] [4:6 P3] [6:8 P2] [8:11 P3] [11:15 P1] [18:22 P1]
+
+Ready queue:
+
+@0 P1
+@1 P2 [1:2 P1]
+@2 P3 [2:4 P1,P3]
+[4:6 P1]
+[6:7 P1,P3]
+[7:8 P1,P3]
+[8:11 P1]
+
+IO waiting queue:
+
+[4:6 P2] [6:7 P3] [15:18 P1]

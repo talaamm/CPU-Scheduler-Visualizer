@@ -1,0 +1,19 @@
+in the scenario:
+Process: P1 | Arrival: 0 | State: 0 | Bursts: 3
+Burst sequence: [CPU 5] [IO 3] [CPU 4]
+
+Process: P2 | Arrival: 1 | State: 0 | Bursts: 3
+Burst sequence: [CPU 3] [IO 2] [CPU 2]
+
+Process: P3 | Arrival: 2 | State: 0 | Bursts: 3
+Burst sequence: [CPU 2] [IO 1] [CPU 3]
+
+output must look like:
+CPU gantt chart: 
+[0:5 P1] [5:8 P2] [8:10 P3] [10:14 P1] [14:16 P2] [16:19 P3]
+
+Ready queue - mark in it where processes arrived:
+@0 P1 @1P2 [1:2 p2] @2P3 [2:5 P2,P3] [5:8 P3] [8:10 P1] [10:11 P2] [11:14 P2, P3] [14:16 P3]
+
+Io waiting queue: 
+[5:8 P1][8:10 P2][10:11 P3]

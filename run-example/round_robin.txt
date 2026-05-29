@@ -1,0 +1,31 @@
+Quantum Q = 2
+
+Processes:
+
+P1: Arrival 0 | CPU 5 | IO 3 | CPU 4
+P2: Arrival 1 | CPU 3 | IO 2 | CPU 2
+P3: Arrival 2 | CPU 2 | IO 1 | CPU 3
+
+CPU gantt chart
+[0:2 P1] [2:4 P2] [4:6 P3]
+[6:8 P1] [8:9 P2] [9:11 P3]
+[11:12 P1] [12:14 P2]
+[14:15 P3] [15:19 P1]
+
+Ready queue:
+@0 P1
+@1 P2 [1:2 P2]
+@2 P3 [2:4 P3,P1]
+[4:6 P1,P2]
+[6:7 P2]
+[7:8 P2,P3]
+[8:9 P3,P1]
+[9:11 P1]
+[11:12 P3,P2]
+[12:14 P3]
+
+IO waiting queue:
+
+[6:7 P3]
+[9:11 P2]
+[12:15 P1]

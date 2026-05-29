@@ -1,0 +1,30 @@
+Given:
+
+P1: Arrival 0 → CPU 5 → IO 3 → CPU 4
+P2: Arrival 1 → CPU 3 → IO 2 → CPU 2
+P3: Arrival 2 → CPU 2 → IO 1 → CPU 3
+
+output: SJF scheduling - 
+CPU gantt chart:
+[0:5 P1] [5:7 P3] [7:10 P2] [10:13 P3] [13:15 P2] [15:19 P1]
+
+Ready queue — mark arrivals:
+@0 P1
+@1 P2 [1:2 P2]
+@2 P3 [2:5 P2,P3]
+[5:7 P2]
+[7:8 Empty]
+[8:10 P1,P3]
+[10:12 P1]
+[12:13 P1,P2]
+[13:15 P1]
+
+IO (waiting) queue:
+[5:8 P1]
+[7:8 P3]
+[10:12 P2]
+
+
+for SJF with I/O bursts, after a process returns from I/O 
+it must be inserted back into the ready queue according 
+to its next CPU burst length, not by its original arrival order.

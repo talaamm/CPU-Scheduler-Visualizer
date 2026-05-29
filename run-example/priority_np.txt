@@ -1,0 +1,30 @@
+Processes:
+
+P1: Arrival 0 | CPU 5 | IO 3 | CPU 4
+P2: Arrival 1 | CPU 3 | IO 2 | CPU 2
+P3: Arrival 2 | CPU 2 | IO 1 | CPU 3
+
+Assume priorities:
+
+P1 priority = 3
+P2 priority = 1
+P3 priority = 2
+
+Smaller number = higher priority
+
+Non-preemptive:
+once CPU starts a process, it finishes its CPU burst.
+
+CPU gantt chart
+[0:5 P1]
+[5:8 P2]
+[8:10 P3]
+[10:12 P2]
+[12:15 P3]
+[15:19 P1]
+
+Explanation:
+
+At t=5 → P2 highest priority
+At t=8 → P3 higher than P1
+At t=12 → P2 returns with highest priority
