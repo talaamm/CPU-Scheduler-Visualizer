@@ -1,0 +1,30 @@
+package algorithms
+
+import (
+	"../core"
+	"../simulation"
+)
+
+type FCFSscheduler struct{}
+
+/*In Go, interfaces are implemented implicitly,
+we do not use an implements keyword like in Java
+If a struct implements all the methods declared by an interface,
+==> that struct is considered to be an implementation of that interface.*/
+
+func NewFCFS() *FCFSscheduler { // constructor
+	return &FCFSscheduler{}
+}
+
+func (f *FCFSscheduler) Name() string { // method to satisfy Scheduler interface
+	return "FCFS"
+}
+
+func (f *FCFSscheduler) Run(processes []core.Process) simulation.SimulationResult {
+
+	var result simulation.SimulationResult
+	// TODO:
+	// FCFS implementation
+
+	return result
+}
