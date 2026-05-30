@@ -1,572 +1,486 @@
 # CPU Scheduler Visualizer
 
-## 📖 Overview
+## Overview
 
-This project is an interactive CPU Scheduling Simulator and Visualization tool that demonstrates how different CPU scheduling algorithms behave under the same workload.
+CPU Scheduler Visualizer is an interactive Operating Systems educational platform that allows users to create custom workloads, simulate CPU scheduling algorithms, visualize process execution, and compare algorithm performance.
 
-It allows users to define processes with multiple CPU bursts, configure scheduling parameters, and compare the performance of different scheduling algorithms through visual and statistical outputs.
+The project aims to bridge Operating Systems theory with practical understanding through real-time visualization and performance analysis.
 
-The goal is to bridge theoretical Operating Systems concepts with practical performance insights.
-
----
-
-## 🎯 Objectives
-
-- Implement core CPU scheduling algorithms in C.
-- Simulate realistic process execution with multiple CPU bursts
-- Support configurable scheduling parameters (e.g., Round Robin quantum)
-- Provide performance comparison between all algorithms for a given scenario
-- Visualize scheduling behavior using charts and timelines
-- Analyze tradeoffs between fairness, throughput, and response time
+Users can define processes containing multiple CPU and I/O bursts, select scheduling algorithms, run simulations, and inspect detailed execution timelines and metrics.
 
 ---
 
-## 🧠 Key Concepts Covered
+# Goals
 
-- Process lifecycle (Ready, Running, Waiting, Terminated)
-- CPU burst and I/O burst modeling
-- CPU scheduling algorithms
-- Context switching
-- Performance metrics:
-  - Average waiting time
-  - Turnaround time
-  - Response time
-  - CPU utilization
-- Throughput and fairness tradeoffs
+## Educational Goals
 
----
+* Understand CPU scheduling algorithms
+* Visualize process state transitions
+* Demonstrate CPU and I/O interaction
+* Show effects of scheduling decisions on performance
+* Compare scheduling policies under identical workloads
 
-## ⚙️ Supported Scheduling Algorithms
+## Technical Goals
 
-The simulator will implement:
-
-1. First Come First Serve (FCFS)
-2. Shortest Job First (SJF - Non-preemptive)
-3. Shortest Remaining Time First (SRTF)
-4. Round Robin (RR)
-5. Priority Scheduling (pree-emptivee / non-preemptive)
-6. Priority with RR
-7. Multi-level Queue (Future Implementation)
-8. Multi-level feedback Queue  (Future Implementation)
+* Build a reusable scheduling simulation engine
+* Separate scheduling policy from simulation logic
+* Create an interactive web-based visualization platform
+* Expose simulation functionality through a backend API
+* Support future extension to advanced scheduling concepts
 
 ---
 
-## 🧩 System Features
+# Core Concepts
 
-### 1. Process Builder
+The simulator models:
 
-Users can define processes with:
+* Processes
+* CPU bursts
+* I/O bursts
+* Ready queue
+* I/O queue
+* CPU execution
+* Process state transitions
 
-- Process ID
-- Arrival Time
-- Multiple CPU bursts
-- I/O bursts
+Process states:
 
-Example:
-
-```bash
-P1:
-Arrival: 0
-Bursts: [CPU 5, IO 3, CPU 4]
-```
-
----
-
-### 2. Scheduling Configuration
-
-- Select scheduling algorithm
-- Set Round Robin time quantum (if applicable)
-- Choose simulation speed (for visualization mode REAL TIME ANALOGY?)
+* NEW
+* READY
+* RUNNING
+* WAITING
+* TERMINATED
 
 ---
 
-### 3. Simulation Engine (C Backend)
+# System Architecture
 
-The backend will simulate:
-
-- Time progression
-- Process state transitions
-- Queue management
-- CPU allocation per time unit
-
-Output:
-
-- Execution timeline
-- Process state history
-- Scheduling decisions log
-
----
-
-### 4. Output Data Format
-
-The C engine will export results as:
-
-- JSON (preferred)
-- or CSV (fallback)?
-
-Example structure:
-
-```json
-{
-  "timeline": [
-    {"time": 0, "process": "P1"},
-    {"time": 1, "process": "P1"},
-    {"time": 2, "process": "P2"}
-  ],
-  "metrics": {
-    "P1": {
-      "waiting_time": 5,
-      "turnaround_time": 12
-    }
-  }
-}
-```
-
----
-
-## 🧭 System Modes
-
-The simulator supports two main operating modes to improve usability and flexibility:
-
-### 1. Single Algorithm Mode
-
-This mode allows users to select one scheduling algorithm and run a full simulation.
-
-#### Purpose
-
-- Educational understanding of a single algorithm
-- Step-by-step visualization of execution
-- Focus on intuition rather than comparison
-
-#### Features
-
-- Select one algorithm:
-  - FCFS
-  - SJF
-  - SRTF
-  - Round Robin
-  - Priority Scheduling
-- Configure parameters (e.g., time quantum for RR)
-- Run simulation
-- View:
-  - Gantt chart
-  - Process execution timeline
-  - Performance metrics (for that algorithm only)
-
----
-
-### 2. Comparative Analysis Mode
-
-This mode runs multiple scheduling algorithms on the same process set.
-
-#### Purpose
-
-- Performance comparison
-- System behavior analysis
-- Educational insight into tradeoffs
-
-#### Features
-
-- Run all selected algorithms on identical input
-- Automatically compute and compare:
-  - Average Waiting Time
-  - Turnaround Time
-  - Response Time
-  - CPU Utilization
-- Generate comparative visualizations:
-  - Side-by-side Gantt charts
-  - Bar charts for performance metrics
-- Highlight best-performing algorithm per metric
-
----
-
-## 🔁 Mode Selection Flow (Frontend Design)
+## High-Level Architecture
 
 ```text
-User Input
+Frontend
     ↓
-Select Mode:
-    ├── Single Algorithm Mode
-    │       ↓
-    │   Choose Algorithm → Run Simulation → Visualize Output
-    │
-    └── Comparative Mode ? between all or just 2?
-            ↓
-    Run All (OR SELECTED?) Algorithms → Collect Metrics → Compare → Visualize Results
+REST API
+    ↓
+Simulation Engine
+    ↓
+Scheduling Policy
 ```
 
 ---
 
-🎯 Design Benefit
+## Component Breakdown
 
-This dual-mode design allows the system to serve two audiences:
+### Frontend
 
-Beginners → understand how each algorithm works individually
-Advanced users → analyze and compare performance tradeoffs
+Responsibilities:
 
-It transforms the project from a simple simulator into an interactive educational OS analysis tool.
+* Process creation
+* Workload configuration
+* Algorithm selection
+* Visualization
+* Performance comparison
+
+Technology:
+
+* HTML
+* Tailwind CSS
+* JavaScript
+* Chart.js
 
 ---
 
-Project Structure
+### API Layer
 
-```t
-CPU-Scheduler-Visualizer/
+Responsibilities:
+
+* Receive simulation requests
+* Validate input
+* Execute scheduler
+* Return simulation results
+
+Technology:
+
+* Go
+* Gin (optional)
+
+---
+
+### Simulation Engine
+
+Responsibilities:
+
+* Time progression
+* Process arrivals
+* Ready queue management
+* I/O queue management
+* CPU execution
+* State transitions
+* Timeline generation
+* Metrics collection
+
+The engine is independent of scheduling algorithms.
+
+---
+
+### Scheduling Policies
+
+Responsibilities:
+
+* Decide which READY process receives CPU
+
+Policies:
+
+* FCFS
+* SJF
+* Round Robin
+* Priority Scheduling
+* SRTF
+
+Scheduling algorithms contain only selection logic.
+
+---
+
+# Project Structure
+
+```text
+cpu-scheduler-visualizer/
+
+cmd/
+└── server/
+    └── main.go
+
+internal/
+
+├── process/
+│   ├── process.go
+│   ├── burst.go
+│   └── state.go
 │
-├── 📂 backend/                          # C simulation engine
-│   ├── 📂 algorithms/                   # Each algorithm in its own file
-│   │   ├── fcfs.c                       # FCFS implementation
-│   │   ├── fcfs.h
-│   │   ├── sjf.c                        # SJF (non-preemptive)
-│   │   ├── sjf.h
-│   │   ├── srtf.c                       # Shortest Remaining Time First
-│   │   ├── srtf.h
-│   │   ├── round_robin.c                # Round Robin
-│   │   ├── round_robin.h
-│   │   ├── priority.c                   # Priority Scheduling
-│   │   ├── priority.h
-│   │   ├── priority_rr.c                # Priority + Round Robin
-│   │   ├── priority_rr.h
-│   │   ├── multilevel_queue.c           # Multi-level Queue (future)
-│   │   └── multilevel_queue.h
-│   │
-│   ├── 📂 core/                         # Core simulation engine
-│   │   ├── process.c                    # Process structure & lifecycle
-│   │   ├── process.h
-│   │   ├── queue.c                      # Queue management
-│   │   ├── queue.h
-│   │   ├── scheduler.c                  # Main scheduler dispatcher
-│   │   ├── scheduler.h
-│   │   └── simulation.c                 # Simulation engine
-│   │   └── simulation.h
-│   │
-│   ├── 📂 utils/                        # Utility functions
-│   │   ├── json_output.c                # JSON export
-│   │   ├── json_output.h
-│   │   ├── csv_output.c                 # CSV export
-│   │   ├── csv_output.h
-│   │   ├── metrics.c                    # Performance metrics calculation
-│   │   ├── metrics.h
-│   │   └── config_parser.c              # Parse input configuration
-│   │   └── config_parser.h
-│   │
-│   ├── main.c                           # Entry point
-│   ├── Makefile                         # Build configuration
-│   └── CMakeLists.txt                   # (Alternative build system)
+├── simulation/
+│   ├── engine.go
+│   ├── cpu.go
+│   ├── io.go
+│   ├── timeline.go
+│   ├── metrics.go
+│   └── result.go
 │
-├── 📂 frontend/                         # Web/GUI interface
-│   ├── 📂 public/
-│   │   ├── index.html
-│   │   └── favicon.ico
-│   │
-│   ├── 📂 src/
-│   │   ├── 📂 components/
-│   │   │   ├── ProcessBuilder.js        # Define processes UI
-│   │   │   ├── AlgorithmSelector.js     # Choose algorithm(s)
-│   │   │   ├── ConfigPanel.js           # Set parameters (quantum, etc.)
-│   │   │   ├── GanttChart.js            # Visualization
-│   │   │   ├── MetricsDisplay.js        # Show performance stats
-│   │   │   └── ComparisonPanel.js       # Comparative mode UI
-│   │   │
-│   │   ├── 📂 api/
-│   │   │   └── simulator.js             # API calls to backend
-│   │   │
-│   │   ├── 📂 utils/
-│   │   │   ├── parser.js                # Parse input
-│   │   │   └── formatter.js             # Format output data
-│   │   │
-│   │   ├── App.js                       # Main app component
-│   │   └── index.js
-│   │
-│   ├── package.json
-│   └── .gitignore
+├── scheduler/
+│   ├── scheduler.go
+│   ├── fcfs.go
+│   ├── sjf.go
+│   ├── rr.go
+│   ├── priority.go
+│   └── srtf.go
 │
-├── 📂 docs/
-│   ├── algorithms.md                    # Algorithm explanations
-│   ├── api.md                           # Backend API docs
-│   ├── setup.md                         # Setup instructions
-│   └── examples.md                      # Usage examples
+├── api/
+│   ├── routes.go
+│   ├── handlers.go
+│   └── dto.go
 │
-├── 📂 tests/                            # Test suite
-│   ├── 📂 backend/
-│   │   ├── test_fcfs.c
-│   │   ├── test_sjf.c
-│   │   ├── test_round_robin.c
-│   │   └── test_metrics.c
-│   │
-│   └── 📂 frontend/
-│       ├── components.test.js
-│       └── api.test.js
-│
-├── Project Plan.md
-├── README.md                            # Project overview
-└── .gitignore
+└── queue/
+    ├── ready_queue.go
+    └── io_queue.go
+
+web/
+
+├── static/
+├── assets/
+└── frontend/
+
+README.md
+go.mod
 ```
 
 ---
 
-### AI Usage
+# Data Model
 
-Planning helper: ChatGPT - codex
-Coding helper: VS Code Co-pilot: Claude Haiku 4.5 agent
+## Process
 
----
+Fields:
 
-# SWITCHING FROM C-LANG TO GO-LANG
-
-Yes. Honestly, for *this specific project* (CPU scheduling simulator with queues/events/processes), Go would probably feel much cleaner and easier to reason about than C — especially for you.
-
-Not because C is bad. C is actually the classic OS language.
-But because right now you're still building:
-
-* architecture thinking
-* abstraction skills
-* simulation logic
-* data structure confidence
-
-and C forces you to fight:
-
-* memory management
-* pointers
-* linked list bugs
-* malloc/free
-* manual resizing
-* string handling
-* queue bookkeeping
-
-ALL while also learning scheduling algorithms.
-
-That becomes mentally exhausting.
+* PID
+* Arrival Time
+* Bursts
+* Current Burst Index
+* Remaining Burst Time
+* State
+* Waiting Time
+* Response Time
+* Turnaround Time
+* Completion Time
 
 ---
 
-# Why your C code probably feels “too complicated”
+## Burst
 
-Because in C, even SIMPLE concepts become verbose.
+Fields:
 
-Example:
-A ready queue in C often becomes:
+* Type
 
-```c id="gqglfx"
-typedef struct Node {
-    Process *process;
-    struct Node *next;
-} Node;
-```
-
-then:
-
-* enqueue
-* dequeue
-* free memory
-* NULL checks
-* pointer bugs
-
-But conceptually you only wanted:
-
-> “put process into queue”
+  * CPU
+  * IO
+* Duration
 
 ---
 
-# In Go, the SAME idea becomes:
+## Timeline Entry
 
-```go id="dgrn0e"
-readyQueue := []*Process{}
-```
+Fields:
 
-enqueue:
+* Time
+* Process ID
+* Event Type
 
-```go id="u0q1sa"
-readyQueue = append(readyQueue, p)
-```
+Examples:
 
-dequeue:
-
-```go id="0g9v1z"
-p := readyQueue[0]
-readyQueue = readyQueue[1:]
-```
-
-MUCH closer to how your brain thinks.
+* RUNNING
+* READY
+* WAITING
+* TERMINATED
+* IDLE
 
 ---
 
-# For scheduling simulators, Go is REALLY nice because:
+# Scheduler Interface
 
-## 1. Structs are clean
+Every algorithm implements:
 
-```go id="t9b1iv"
-type Process struct {
-    ID           string
-    ArrivalTime  int
-    Bursts       []Burst
-    CurrentBurst int
-    Remaining    int
-    Priority     int
+```go
+type Scheduler interface {
+    Run(processes []process.Process) simulation.SimulationResult
+    Name() string
 }
 ```
 
-Readable immediately.
+This allows all algorithms to be executed interchangeably.
 
 ---
 
-## 2. Dynamic arrays (slices)
+# User Modes
 
-No malloc headaches.
+## Single Algorithm Mode
 
-```go id="i0m31d"
-ready := []*Process{}
-ioQueue := []*Process{}
-```
+Purpose:
 
----
+Visualize one algorithm in detail.
 
-## 3. Sorting is easy
+Workflow:
 
-SJF:
+1. Create processes
+2. Select algorithm
+3. Run simulation
+4. View execution timeline
+5. View metrics
 
-```go id="sv2r44"
-sort.Slice(ready, func(i, j int) bool {
-    return ready[i].Remaining < ready[j].Remaining
-})
-```
+Outputs:
 
-Done.
-
----
-
-## 4. Maps are beautiful
-
-```go id="z3xw1g"
-processMap := map[string]*Process{}
-```
+* Gantt Chart
+* Timeline Animation
+* Process Statistics
 
 ---
 
-## 5. Less code noise
+## Comparative Analysis Mode
 
-C code often becomes:
+Purpose:
 
-* 60% infrastructure
-* 40% actual scheduling logic
+Compare multiple algorithms using the same workload.
 
-Go becomes:
+Workflow:
 
-* 80% scheduling logic
-* 20% infrastructure
+1. Create workload
+2. Select algorithms
+3. Run simulations
+4. Compare results
 
-which is MUCH better for learning algorithms.
+Outputs:
 
----
-
-# BUT — very important
-
-## Using Go will NOT automatically simplify BAD architecture.
-
-You can still write:
-
-* giant functions
-* duplicated schedulers
-* messy state handling
-
-in Go.
-
-The BIGGEST improvement comes from architecture, not language.
+* Waiting Time Comparison
+* Turnaround Time Comparison
+* Response Time Comparison
+* CPU Utilization Comparison
+* Throughput Comparison
 
 ---
 
-# The ideal design in Go
+# Visualization Features
 
-You’d want something like:
+## Process Builder
 
-```text id="n6h5sq"
-scheduler/
-    fcfs.go
-    sjf.go
-    srtf.go
-    rr.go
-    priority.go
+Users can:
 
-simulation/
-    engine.go
-    process.go
-    queue.go
-```
+* Add processes
+* Add CPU bursts
+* Add I/O bursts
+* Configure arrival times
 
-Where:
+Example:
 
-* engine handles time/events
-* schedulers only choose next process
+P1:
+Arrival = 0
 
-THAT is the clean part.
+Bursts:
+CPU 5
+IO 3
+CPU 4
 
 ---
 
-# Another important thing
+## Timeline Visualization
 
-If this is for an OS course:
+Animated execution timeline showing:
 
-Your professor may EXPECT C.
-
-So before rewriting:
-check:
-
-* assignment requirements
-* grading language
-* restrictions
-
-because some OS courses only allow:
-
-* C
-* C++
-* maybe Java
+* Running process
+* CPU idle periods
+* State transitions
 
 ---
 
-# My actual recommendation for YOU specifically
+## Gantt Chart
 
-Since you already know some Go and are still developing abstraction skills:
+Visual representation of CPU allocation over time.
 
-## If language is NOT restricted:
+Example:
 
-Use Go.
-
-You will:
-
-* learn faster
-* debug faster
-* iterate faster
-* understand the scheduler better
-* focus on concepts instead of memory bugs
-
-And your code will probably become:
-
-* shorter
-* cleaner
-* easier to extend
-
-especially for:
-
-* SRTF
-* RR
-* Priority RR
-* IO handling
+| P1 | P1 | P1 | P2 | P2 | P3 |
 
 ---
 
-# One warning though
+## Queue Visualization
 
-Do NOT let Claude write the whole thing blindly.
+Display:
 
-Because then you end up with:
+* Ready Queue
+* I/O Queue
 
-* code that works
-* but architecture you don’t understand
+As simulation progresses.
 
-Instead:
+---
 
-* build small pieces yourself
-* ask AI for review/help
-* refactor gradually
+## Metrics Dashboard
 
-That’s how your engineering skill grows.
+Display:
+
+* Average Waiting Time
+* Average Turnaround Time
+* Average Response Time
+* CPU Utilization
+* Throughput
+
+---
+
+## Comparative Charts
+
+Using Chart.js:
+
+* Bar Charts
+* Line Charts
+* Algorithm Ranking
+
+---
+
+# Metrics
+
+For each process:
+
+* Waiting Time
+* Turnaround Time
+* Response Time
+* Completion Time
+
+System metrics:
+
+* CPU Utilization
+* Throughput
+* Average Waiting Time
+* Average Turnaround Time
+* Average Response Time
+
+---
+
+# Future Extensions
+
+## Advanced Scheduling
+
+* Multi-Level Queue
+* Multi-Level Feedback Queue
+* Lottery Scheduling
+
+## Multiprocessor Support
+
+* Multiple CPUs
+* Load Balancing
+* CPU Affinity
+
+## Hardware Concepts
+
+* Context Switch Cost
+* Cache Penalties
+* NUMA Awareness
+
+## Memory Management
+
+Potential future module:
+
+* Paging Visualization
+* Page Replacement Algorithms
+
+## Deadlock Simulation
+
+Potential future module:
+
+* Resource Allocation Graphs
+* Deadlock Detection
+* Deadlock Avoidance
+
+---
+
+# Portfolio Value
+
+This project demonstrates:
+
+* Operating Systems knowledge
+* Scheduling algorithms
+* Data structures
+* Simulation design
+* Backend development
+* API design
+* Software architecture
+* Data visualization
+* Performance analysis
+
+The project serves as both an educational tool and a systems engineering portfolio piece.
+
+---
+
+## Project Phases
+
+### Phase 1
+
+Process model
+Simulation engine
+FCFS
+RR
+
+### Phase 2
+
+SJF
+Priority
+SRTF
+
+### Phase 3
+
+REST API
+
+### Phase 4
+
+Frontend visualizer
+
+### Phase 5
+
+Comparative mode
+
+### Phase 6
+
+Deployment + demo video + portfolio write-up
