@@ -1,8 +1,8 @@
 package algorithms
 
 import (
-	"../core"
-	"../simulation"
+	"cpu-scheduler/core"
+	"cpu-scheduler/simulation"
 )
 
 type SRTFscheduler struct{}

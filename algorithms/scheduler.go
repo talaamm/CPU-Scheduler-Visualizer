@@ -1,8 +1,8 @@
 package algorithms
 
 import (
-	"../core"
-	"../simulation"
+	"cpu-scheduler/core"
+	"cpu-scheduler/simulation"
 )
 
 // all algos will implement same interface
@@ -13,6 +13,6 @@ type Scheduler interface {
 }
 
 /*interface is better and cleaner so that
-frontend api can call any algo without caring 
+frontend api can call any algo without caring
 about implementation details or what algo it is
 */

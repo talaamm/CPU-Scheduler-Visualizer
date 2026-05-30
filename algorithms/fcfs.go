@@ -1,8 +1,8 @@
 package algorithms
 
 import (
-	"../core"
-	"../simulation"
+	"cpu-scheduler/core"
+	"cpu-scheduler/simulation"
 )
 
 type FCFSscheduler struct{}
@@ -23,7 +23,7 @@ func (f *FCFSscheduler) Name() string { // method to satisfy Scheduler interface
 func (f *FCFSscheduler) Run(processes []core.Process) simulation.SimulationResult {
 
 	// FCFS implementation
-	return simulation.Run(processes, f.Name(), simulation.SchedulingPolicy{
+	return simulation.Run(processes, "FCFS", simulation.SchedulingPolicy{
 		SelectNext: func(s *simulation.Simulation) *core.Process {
 			return s.FirstReady()
 		},
