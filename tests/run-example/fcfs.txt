@@ -1,0 +1,72 @@
+in the scenario:
+Process: P1 | Arrival: 0 | State: 0 | Bursts: 3
+Burst sequence: [CPU 5] [IO 3] [CPU 4]
+
+Process: P2 | Arrival: 1 | State: 0 | Bursts: 3
+Burst sequence: [CPU 3] [IO 2] [CPU 2]
+
+Process: P3 | Arrival: 2 | State: 0 | Bursts: 3
+Burst sequence: [CPU 2] [IO 1] [CPU 3]
+
+output must look like:
+CPU gantt chart: 
+[0:5 P1] [5:8 P2] [8:10 P3] [10:14 P1] [14:16 P2] [16:19 P3]
+
+Ready queue - mark in it where processes arrived:
+@0 P1 @1P2 [1:2 p2] @2P3 [2:5 P2,P3] [5:8 P3] [8:10 P1] [10:11 P2] [11:14 P2, P3] [14:16 P3]
+
+Io waiting queue: 
+[5:8 P1][8:10 P2][10:11 P3]
+
+---
+
+Edge Case 1: CPU Idle Before First Arrival
+
+Input:
+P1 arrives at 5 , bursts: [CPU 3] 
+
+Gantt:
+[0:5 IDLE]
+[5:8 P1]
+
+This validates:
+arrival handling
+idle periods
+
+---
+
+Edge Case 2: CPU Becomes Idle While Everyone Is In IO
+
+Input:
+P1: [CPU 2] [IO 5] [CPU 2]
+P2: [CPU 2] [IO 5] [CPU 2]
+Both arrive at 0
+
+Expected Gantt:
+[0:2 P1]
+[2:4 P2]
+[4:7 IDLE]
+[7:9 P1]
+[9:11 P2]
+
+This test catches:
+IO completion bugs
+infinite loops
+scheduler starvation
+idle handling mistakes
+
+---
+
+Edge Case 3: Same Arrival Time
+
+Input:
+P1 arrival 0 [CPU 3]
+P2 arrival 0 [CPU 2]
+P3 arrival 0 [CPU 1]
+
+Expected FCFS:
+[0:3 P1] [3:5 P2] [5:6 P3]
+
+This validates:
+queue insertion order
+stability of your arrival handling

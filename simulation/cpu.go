@@ -1,10 +1,10 @@
 package simulation
 
-import "../core"
+import "github.com/talaamm/cpu-scheduler-visualizer/core"
 
 func (s *Simulation) ExecuteCPU(quantum int) {
 	p := s.RunningProcess
-	if p == nil {
+	if p == nil { // CPU is idle
 		s.Timeline = append(s.Timeline, TimelineEntry{
 			Time:      s.Time,
 			ProcessID: "IDLE",
@@ -34,7 +34,7 @@ func (s *Simulation) ExecuteCPU(quantum int) {
 		return
 	}
 
-	if quantum > 0 && s.CurrentQuantumUsed == quantum {
+	if quantum > 0 && s.CurrentQuantumUsed == quantum { // for rr
 		s.RunningProcess = nil
 		s.CurrentQuantumUsed = 0
 		p.State = core.StateReady

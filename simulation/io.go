@@ -1,13 +1,13 @@
 package simulation
 
-import "../core"
+import "github.com/talaamm/cpu-scheduler-visualizer/core"
 
 type IOEntry struct {
 	Process        *core.Process
 	CompletionTime int
 }
 
-
+// Handles IO completion and moves processes back to ready queue when their IO is done
 func (s *Simulation) HandleIOCompletion() {
 	remaining := s.IOQueue[:0]
 	for _, entry := range s.IOQueue {

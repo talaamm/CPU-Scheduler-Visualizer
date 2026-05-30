@@ -1,8 +1,8 @@
 package algorithms
 
 import (
-	"cpu-scheduler/core"
-	"cpu-scheduler/simulation"
+	"github.com/talaamm/cpu-scheduler-visualizer/core"
+	"github.com/talaamm/cpu-scheduler-visualizer/simulation"
 )
 
 type SJFscheduler struct{}

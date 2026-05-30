@@ -1,12 +1,11 @@
 package simulation
 
-import "../core"
-
+import "github.com/talaamm/cpu-scheduler-visualizer/core"
 
 type SchedulingPolicy struct {
 	SelectNext    func(*Simulation) *core.Process
-	ShouldPreempt func(*Simulation) *core.Process
-	Quantum       int
+	ShouldPreempt func(*Simulation) *core.Process // if not given assume no preemption
+	Quantum       int                             // if not given assume no time slicing
 }
 
 // stores the ENTIRE CURRENT STATE OF THE SYSTEM at any moment in time
@@ -55,8 +54,6 @@ func NewSimulation(processes []core.Process) *Simulation {
 	}
 }
 
-
-
 func (s *Simulation) AllProcessesCompleted() bool {
 	return len(s.Processes) == s.CompletedProcesses
 	// for _, p := range s.Processes {
@@ -68,34 +65,31 @@ func (s *Simulation) AllProcessesCompleted() bool {
 	// return true
 }
 
-
 func (s *Simulation) Step(policy SchedulingPolicy) {
 	s.HandleArrivals()
 	s.HandleIOCompletion()
 	s.FlushPendingReady()
 
-	if s.RunningProcess != nil && policy.ShouldPreempt != nil {
+	if s.RunningProcess != nil && policy.ShouldPreempt != nil { // check if we should preempt the current running process
 		next := policy.ShouldPreempt(s)
 		if next != nil {
 			s.RemoveFromReady(next)
 			current := s.RunningProcess
 			s.RunningProcess = nil
-			current.State = core.StateReady
+			current.State = core.StateReady // preempt change state from running to ready
 			s.EnqueueReady(current)
 			s.AssignCPU(next)
 		}
 	}
 
-	if s.CPUIdle() && policy.SelectNext != nil {
-		next := policy.SelectNext(s)
+	if s.CPUIdle() && policy.SelectNext != nil { // select next w/out arg  just to check it exists
+		next := policy.SelectNext(s) // calls - invokes that function
 		if next != nil {
 			s.RemoveFromReady(next)
 			s.AssignCPU(next)
 		}
 	}
-
-	s.ExecuteCPU(policy.Quantum)
-
+	s.ExecuteCPU(policy.Quantum) // if quantum is 0 it will just ignore it and run until burst completion or preemption
 	s.Time++
 }
 
@@ -106,7 +100,6 @@ func Run(processes []core.Process, algorithm string, policy SchedulingPolicy) Si
 	}
 	return sim.BuildResult(algorithm)
 }
-
 
 func (s *Simulation) CompleteCurrentBurstAt(p *core.Process, finishedAt int) {
 	// 1. Move to next burst
@@ -146,7 +139,6 @@ func (s *Simulation) CompleteCurrentBurstAt(p *core.Process, finishedAt int) {
 	      → OR next CPU burst
 	      → OR process finished*/
 }
-
 
 func (s *Simulation) CompleteCurrentBurst(p *core.Process) {
 	s.CompleteCurrentBurstAt(p, s.Time+1)

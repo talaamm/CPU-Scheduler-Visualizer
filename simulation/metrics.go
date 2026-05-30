@@ -1,6 +1,6 @@
 package simulation
 
-import "../core"
+import "github.com/talaamm/cpu-scheduler-visualizer/core"
 
 func (s *Simulation) BuildResult(algorithm string) SimulationResult {
 	processes := make([]core.Process, len(s.Processes))
@@ -40,7 +40,6 @@ func (s *Simulation) BuildResult(algorithm string) SimulationResult {
 	}
 }
 
-
 func compactTimeline(entries []TimelineEntry) []TimelineEntry {
 	if len(entries) == 0 {
 		return entries
@@ -56,7 +55,6 @@ func compactTimeline(entries []TimelineEntry) []TimelineEntry {
 	}
 	return compacted
 }
-
 
 func totalBurstDuration(p *core.Process) int {
 	total := 0
