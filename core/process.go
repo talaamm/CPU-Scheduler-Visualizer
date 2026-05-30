@@ -21,4 +21,5 @@ type Process struct {
 	ResponseTime   int `json:"response_time"`
 
 	Started bool `json:"started"`
+	Completed bool `json:"completed"`
 }

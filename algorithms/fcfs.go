@@ -22,9 +22,10 @@ func (f *FCFSscheduler) Name() string { // method to satisfy Scheduler interface
 
 func (f *FCFSscheduler) Run(processes []core.Process) simulation.SimulationResult {
 
-	var result simulation.SimulationResult
-	// TODO:
 	// FCFS implementation
-
-	return result
+	return simulation.Run(processes, f.Name(), simulation.SchedulingPolicy{
+		SelectNext: func(s *simulation.Simulation) *core.Process {
+			return s.FirstReady()
+		},
+	})
 }
