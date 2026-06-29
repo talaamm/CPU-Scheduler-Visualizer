@@ -5,6 +5,8 @@ type Process struct {
 
 	ArrivalTime int `json:"arrival_time"`
 
+	Priority int `json:"priority"`
+
 	Bursts []Burst `json:"bursts"`
 
 	CurrentBurstIndex int `json:"current_burst_index"` // which burst process is currently executing
@@ -20,6 +22,6 @@ type Process struct {
 	TurnaroundTime int `json:"turnaround_time"`
 	ResponseTime   int `json:"response_time"`
 
-	Started bool `json:"started"`
+	Started   bool `json:"started"`
 	Completed bool `json:"completed"`
 }

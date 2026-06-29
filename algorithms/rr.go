@@ -20,10 +20,10 @@ func (r *RoundRobinScheduler) Name() string {
 }
 
 func (r *RoundRobinScheduler) Run(processes []core.Process) simulation.SimulationResult {
-	var result simulation.SimulationResult
-
-	// TODO:
-	// RR implementation
-
-	return result
+	return simulation.Run(processes, r.Name(), simulation.SchedulingPolicy{
+		SelectNext: func(s *simulation.Simulation) *core.Process {
+			return s.FirstReady()
+		},
+		Quantum: r.Quantum,
+	})
 }

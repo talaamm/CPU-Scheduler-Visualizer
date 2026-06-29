@@ -1,0 +1,8 @@
+./fcfs.go
+./helpers.go
+./priority_np.go
+./priority_p.go
+./rr.go
+./scheduler.go
+./sjf.go
+./srtf.go

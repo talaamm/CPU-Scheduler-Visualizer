@@ -16,10 +16,19 @@ func (r *SRTFscheduler) Name() string {
 }
 
 func (r *SRTFscheduler) Run(processes []core.Process) simulation.SimulationResult {
-	var result simulation.SimulationResult
-
-	// TODO:
-	// SRTF implementation
-
-	return result
+	return simulation.Run(processes, r.Name(), simulation.SchedulingPolicy{
+		SelectNext: func(s *simulation.Simulation) *core.Process {
+			return shortestRemaining(s.ReadyQueue)
+		},
+		ShouldPreempt: func(s *simulation.Simulation) *core.Process {
+			next := shortestRemaining(s.ReadyQueue)
+			if next == nil || s.RunningProcess == nil {
+				return nil
+			}
+			if next.RemainingBurstTime < s.RunningProcess.RemainingBurstTime {
+				return next
+			}
+			return nil
+		},
+	})
 }

@@ -16,10 +16,19 @@ func (r *PriorityPreempScheduler) Name() string {
 }
 
 func (r *PriorityPreempScheduler) Run(processes []core.Process) simulation.SimulationResult {
-	var result simulation.SimulationResult
-
-	// TODO:
-	// Priority Preemptive implementation
-
-	return result
+	return simulation.Run(processes, r.Name(), simulation.SchedulingPolicy{
+		SelectNext: func(s *simulation.Simulation) *core.Process {
+			return highestPriority(s.ReadyQueue)
+		},
+		ShouldPreempt: func(s *simulation.Simulation) *core.Process {
+			next := highestPriority(s.ReadyQueue)
+			if next == nil || s.RunningProcess == nil {
+				return nil
+			}
+			if next.Priority < s.RunningProcess.Priority {
+				return next
+			}
+			return nil
+		},
+	})
 }

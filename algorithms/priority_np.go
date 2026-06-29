@@ -16,10 +16,9 @@ func (r *PriorityNONprScheduler) Name() string {
 }
 
 func (r *PriorityNONprScheduler) Run(processes []core.Process) simulation.SimulationResult {
-	var result simulation.SimulationResult
-
-	// TODO:
-	// Priority Non-Preemptive implementation
-
-	return result
+	return simulation.Run(processes, r.Name(), simulation.SchedulingPolicy{
+		SelectNext: func(s *simulation.Simulation) *core.Process {
+			return highestPriority(s.ReadyQueue)
+		},
+	})
 }

@@ -16,10 +16,9 @@ func (r *SJFscheduler) Name() string {
 }
 
 func (r *SJFscheduler) Run(processes []core.Process) simulation.SimulationResult {
-	var result simulation.SimulationResult
-
-	// TODO:
-	// SJF implementation
-
-	return result
+	return simulation.Run(processes, r.Name(), simulation.SchedulingPolicy{
+		SelectNext: func(s *simulation.Simulation) *core.Process {
+			return shortestRemaining(s.ReadyQueue)
+		},
+	})
 }
