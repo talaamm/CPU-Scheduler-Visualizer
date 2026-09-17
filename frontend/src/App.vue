@@ -50,9 +50,24 @@
 
           <template v-else-if="!sim.result">
             <div class="empty-state">
-              <div class="empty-icon">⏱</div>
-              <div class="empty-title">Ready to simulate</div>
-              <div class="empty-sub">Configure processes, pick an algorithm, and click Run.</div>
+              <template v-if="sim.isLoading">
+                <div class="empty-icon spinning">⏳</div>
+                <div class="empty-title">
+                  {{ sim.isSlowToRespond ? 'Waking up the backend…' : 'Running simulation…' }}
+                </div>
+                <div class="empty-sub">
+                  {{
+                    sim.isSlowToRespond
+                      ? 'This app runs on free hosting that sleeps after 15 minutes idle — the first request can take up to a minute. It only happens once; everything after this is instant.'
+                      : 'Loading…'
+                  }}
+                </div>
+              </template>
+              <template v-else>
+                <div class="empty-icon">⏱</div>
+                <div class="empty-title">Ready to simulate</div>
+                <div class="empty-sub">Configure processes, pick an algorithm, and click Run.</div>
+              </template>
             </div>
           </template>
 
@@ -124,12 +139,15 @@ useKeyboard({
   onReset: () => sim.reset(),
 })
 
-onMounted(async () => {
-  try {
-    await meta.fetchAll()
-  } catch {
+onMounted(() => {
+  // Fire both requests together rather than awaiting meta first — on a cold
+  // backend (free-tier spin-down), awaiting meta.fetchAll() first meant the
+  // page sat on the static "Ready to simulate" empty state for the entire
+  // 50s+ wake-up with no loading indicator at all. handleRun() drives the
+  // loading/wake-hint UI, so it needs to start immediately on mount.
+  meta.fetchAll().catch(() => {
     // Backend not reachable yet — presets/algorithms fall back to defaults in components
-  }
+  })
   handleRun() // auto-run on load for an immediate "wow" moment
 })
 </script>
@@ -226,6 +244,12 @@ body {
   color: #475569;
 }
 .empty-icon { font-size: 48px; opacity: 0.3; }
+.empty-icon.spinning { opacity: 0.6; animation: empty-icon-pulse 1.4s ease-in-out infinite; }
 .empty-title { font-size: 16px; font-weight: 600; color: #94A3B8; }
-.empty-sub { font-size: 12px; }
+.empty-sub { font-size: 12px; max-width: 340px; text-align: center; line-height: 1.5; }
+
+@keyframes empty-icon-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.08); }
+}
 </style>
