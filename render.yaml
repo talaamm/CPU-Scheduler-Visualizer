@@ -1,19 +1,20 @@
 # Render Blueprint — deploys both services from this repo with one click.
 # https://dashboard.render.com/blueprints -> New Blueprint Instance -> select this repo.
 #
-# Creates:
-#   cpu-scheduler-api          Go REST API (simulation engine)
-#   cpu-scheduler-visualizer   Vue 3 static frontend
+# Live:
+#   https://cpu-scheduler-api.onrender.com                Go REST API
+#   https://cpu-scheduler-visualizer-kce3.onrender.com     Vue 3 static frontend
+#   (the frontend got a "-kce3" suffix because the plain name was taken —
+#   ALLOWED_ORIGINS below must match whatever suffix Render actually assigns)
 #
 # Both are on Render's free plan: no credit card, auto-deploys on every push
 # to main. The free web service (the API) spins down after 15 minutes of
 # inactivity and takes ~30-60s to wake back up on the next request — expected
 # for a low-traffic portfolio demo, not a bug.
 #
-# The URLs below assume both service names are available on Render (they
-# determine the https://<name>.onrender.com subdomain). If Render assigns
-# different names, update ALLOWED_ORIGINS and VITE_API_URL in the dashboard
-# to match — both services redeploy automatically when an env var changes.
+# If either service is ever recreated under a different name/suffix, update
+# ALLOWED_ORIGINS (backend) and VITE_API_URL (frontend) below to match —
+# both services redeploy automatically when this file changes.
 
 services:
   - type: web
@@ -25,7 +26,7 @@ services:
     healthCheckPath: /health
     envVars:
       - key: ALLOWED_ORIGINS
-        value: https://cpu-scheduler-visualizer.onrender.com
+        value: https://cpu-scheduler-visualizer-kce3.onrender.com
 
   - type: web
     name: cpu-scheduler-visualizer

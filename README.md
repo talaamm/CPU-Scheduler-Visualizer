@@ -6,7 +6,7 @@ Give it a set of processes with CPU and I/O bursts, pick an algorithm, and step 
 
 ## Live Demo
 
-**[cpu-scheduler-visualizer.onrender.com](https://cpu-scheduler-visualizer.onrender.com)** *(fill in after deployment — see Deployment below)*
+**[cpu-scheduler-visualizer-kce3.onrender.com](https://cpu-scheduler-visualizer-kce3.onrender.com)**
 
 The API is on Render's free tier, which spins down after 15 minutes of inactivity — the first request after a while may take 30-60s to wake it back up. The UI tells you when that's happening instead of just looking stuck.
 
