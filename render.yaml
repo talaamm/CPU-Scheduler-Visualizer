@@ -19,6 +19,7 @@ services:
   - type: web
     name: cpu-scheduler-api
     runtime: go
+    plan: free
     buildCommand: go build -o bin/server ./backend/cmd/server
     startCommand: ./bin/server
     healthCheckPath: /health

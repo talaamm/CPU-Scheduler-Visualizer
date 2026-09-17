@@ -481,3 +481,24 @@ Portfolio
 Once deployed, your live demo line becomes: "Live demo: [URL] — Vue 3 + TypeScript frontend, Go REST API backend, both deployed free on Render with GitHub auto-deploy." Worth mentioning in an interview: the stateless architecture (no DB needed), the shared-engine/pluggable-policy design, and that you found and fixed two real bugs (the I/O-terminal-burst hang and this interval leak) through systematic testing rather than just eyeballing it.
 
 ✻ Worked for 21m 43s · done 6:56 PM · 2 shells still running
+
+---
+
+
+On the routes: - type: rewrite block you included: this app doesn't use client-side routing — main.ts never installs vue-router even though it's a listed dependency, and the whole UI is one page with local tab state, not routes. An SPA rewrite rule is for apps where a browser refresh on /some/route needs to fall back to index.html; there's no such route here to fall back from. I left it out rather than add it unverified — happy to add it later if you introduce real client-side routing, but it'd be dead configuration right now.
+
+What I didn't touch, as instructed: no payment info, no plan/workspace upgrades, no service deletions, no new account or new workspace, nothing in your Render dashboard (I don't have access to it — I can't see or click anything there; everything above came from documentation research and reading your local render.yaml).
+
+Next step is yours: push this render.yaml change to GitHub, then retry the Blueprint deploy (or just click "Apply" again if it's still open in the dashboard — Render blueprints can usually be re-synced against an updated file without starting over). It should no longer ask for payment information. Let me know what happens — if it still prompts for a card after this, that would tell us something new and I'll dig further rather than assume.
+
+✻ Sautéed for 2m 8s · done 7:24 PM
+
+● Background command "Stop test server and restart normal dev server with open CORS on 8080" was stopped because the system is running low on memory
+
+● Background command "Start Vite dev server" was stopped because the system is running low on memory
+
+The backend and frontend dev servers I'd left running were both stopped automatically — the system was low on memory while the session was idle, not related to anything in the code. I won't restart them on my own; just let me know if you want them back up.
+
+No action needed from me otherwise — still waiting to hear how the Render redeploy goes.
+
+✻ Churned for 6s · done 7:55 PM
