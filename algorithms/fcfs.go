@@ -1,6 +1,8 @@
 package algorithms
 
 import (
+	"strconv"
+
 	"github.com/talaamm/cpu-scheduler-visualizer/core"
 	"github.com/talaamm/cpu-scheduler-visualizer/simulation"
 )
@@ -26,6 +28,9 @@ func (f *FCFSscheduler) Run(processes []core.Process) simulation.SimulationResul
 	return simulation.Run(processes, "FCFS", simulation.SchedulingPolicy{
 		SelectNext: func(s *simulation.Simulation) *core.Process {
 			return s.FirstReady()
+		},
+		Explain: func(s *simulation.Simulation, selected, previous *core.Process) string {
+			return selected.PID + " is next in arrival order (FCFS), arrived at t=" + strconv.Itoa(selected.ArrivalTime)
 		},
 	})
 }

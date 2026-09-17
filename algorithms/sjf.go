@@ -1,6 +1,8 @@
 package algorithms
 
 import (
+	"strconv"
+
 	"github.com/talaamm/cpu-scheduler-visualizer/core"
 	"github.com/talaamm/cpu-scheduler-visualizer/simulation"
 )
@@ -19,6 +21,9 @@ func (r *SJFscheduler) Run(processes []core.Process) simulation.SimulationResult
 	return simulation.Run(processes, r.Name(), simulation.SchedulingPolicy{
 		SelectNext: func(s *simulation.Simulation) *core.Process {
 			return shortestRemaining(s.ReadyQueue)
+		},
+		Explain: func(s *simulation.Simulation, selected, previous *core.Process) string {
+			return selected.PID + " has the shortest next CPU burst (" + strconv.Itoa(selected.RemainingBurstTime) + " units) among ready processes"
 		},
 	})
 }

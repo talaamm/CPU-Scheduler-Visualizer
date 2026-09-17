@@ -1,6 +1,8 @@
 package algorithms
 
 import (
+	"strconv"
+
 	"github.com/talaamm/cpu-scheduler-visualizer/core"
 	"github.com/talaamm/cpu-scheduler-visualizer/simulation"
 )
@@ -25,5 +27,8 @@ func (r *RoundRobinScheduler) Run(processes []core.Process) simulation.Simulatio
 			return s.FirstReady()
 		},
 		Quantum: r.Quantum,
+		Explain: func(s *simulation.Simulation, selected, previous *core.Process) string {
+			return selected.PID + " is next in the round-robin rotation and receives a " + strconv.Itoa(r.Quantum) + "-unit time quantum"
+		},
 	})
 }

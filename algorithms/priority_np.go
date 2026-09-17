@@ -1,6 +1,8 @@
 package algorithms
 
 import (
+	"strconv"
+
 	"github.com/talaamm/cpu-scheduler-visualizer/core"
 	"github.com/talaamm/cpu-scheduler-visualizer/simulation"
 )
@@ -19,6 +21,9 @@ func (r *PriorityNONprScheduler) Run(processes []core.Process) simulation.Simula
 	return simulation.Run(processes, r.Name(), simulation.SchedulingPolicy{
 		SelectNext: func(s *simulation.Simulation) *core.Process {
 			return highestPriority(s.ReadyQueue)
+		},
+		Explain: func(s *simulation.Simulation, selected, previous *core.Process) string {
+			return selected.PID + " has the highest priority (value " + strconv.Itoa(selected.Priority) + ", lower = higher) among ready processes"
 		},
 	})
 }

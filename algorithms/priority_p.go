@@ -1,6 +1,8 @@
 package algorithms
 
 import (
+	"strconv"
+
 	"github.com/talaamm/cpu-scheduler-visualizer/core"
 	"github.com/talaamm/cpu-scheduler-visualizer/simulation"
 )
@@ -29,6 +31,12 @@ func (r *PriorityPreempScheduler) Run(processes []core.Process) simulation.Simul
 				return next
 			}
 			return nil
+		},
+		Explain: func(s *simulation.Simulation, selected, previous *core.Process) string {
+			if previous != nil {
+				return selected.PID + " preempted " + previous.PID + " — priority " + strconv.Itoa(selected.Priority) + " is higher than " + strconv.Itoa(previous.Priority) + " (lower value = higher priority)"
+			}
+			return selected.PID + " has the highest priority (value " + strconv.Itoa(selected.Priority) + ", lower = higher) among ready processes"
 		},
 	})
 }

@@ -31,6 +31,8 @@ func (s *Simulation) BuildResult(algorithm string) SimulationResult {
 	return SimulationResult{
 		Algorithm:             algorithm,
 		Timeline:              compactTimeline(s.Timeline),
+		Snapshots:             s.Snapshots,
+		Events:                s.Events,
 		Processes:             processes,
 		TotalTime:             totalTime,
 		CPUuilization:         cpuUtilization,

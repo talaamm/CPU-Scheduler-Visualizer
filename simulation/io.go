@@ -7,7 +7,9 @@ type IOEntry struct {
 	CompletionTime int
 }
 
-// Handles IO completion and moves processes back to ready queue when their IO is done
+// Handles IO completion and moves processes back to ready queue when their IO is done.
+// A process whose LAST burst is an I/O burst must be marked completed here —
+// otherwise it is silently dropped and the simulation never terminates.
 func (s *Simulation) HandleIOCompletion() {
 	remaining := s.IOQueue[:0]
 	for _, entry := range s.IOQueue {
@@ -17,6 +19,9 @@ func (s *Simulation) HandleIOCompletion() {
 			if p.CurrentBurstIndex < len(p.Bursts) {
 				p.RemainingBurstTime = p.Bursts[p.CurrentBurstIndex].Duration
 				s.EnqueueReady(p)
+				s.emit(EventIODone, p.PID, p.PID+" finished I/O and returned to the ready queue")
+			} else {
+				s.finishProcess(p, s.Time)
 			}
 			continue
 		}

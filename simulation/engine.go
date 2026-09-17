@@ -1,11 +1,21 @@
 package simulation
 
-import "github.com/talaamm/cpu-scheduler-visualizer/core"
+import (
+	"strconv"
+
+	"github.com/talaamm/cpu-scheduler-visualizer/core"
+)
 
 type SchedulingPolicy struct {
 	SelectNext    func(*Simulation) *core.Process
 	ShouldPreempt func(*Simulation) *core.Process // if not given assume no preemption
 	Quantum       int                             // if not given assume no time slicing
+
+	// Explain produces a human-readable reason for why `selected` was given
+	// the CPU. `previous` is nil for a normal selection (CPU was idle) and
+	// non-nil when `selected` preempted `previous`. Optional — if nil, a
+	// generic message is used instead.
+	Explain func(s *Simulation, selected *core.Process, previous *core.Process) string
 }
 
 // stores the ENTIRE CURRENT STATE OF THE SYSTEM at any moment in time
@@ -17,6 +27,8 @@ type Simulation struct {
 	RunningProcess     *core.Process
 	PendingReadyQueue  []*core.Process
 	Timeline           []TimelineEntry
+	Snapshots          []StateSnapshot
+	Events             []Event
 	CompletedProcesses int
 	CPUBusyTime        int
 	CurrentQuantumUsed int
@@ -48,6 +60,8 @@ func NewSimulation(processes []core.Process) *Simulation {
 		RunningProcess:     nil, // not yet we just started, we  have to decide
 		PendingReadyQueue:  []*core.Process{},
 		Timeline:           []TimelineEntry{},
+		Snapshots:          []StateSnapshot{},
+		Events:             []Event{},
 		CompletedProcesses: 0,
 		CPUBusyTime:        0,
 		CurrentQuantumUsed: 0,
@@ -79,6 +93,8 @@ func (s *Simulation) Step(policy SchedulingPolicy) {
 			current.State = core.StateReady // preempt change state from running to ready
 			s.EnqueueReady(current)
 			s.AssignCPU(next)
+			s.emit(EventPreempted, current.PID, s.explain(policy, next, current))
+			s.emit(EventSelected, next.PID, s.explain(policy, next, current))
 		}
 	}
 
@@ -87,10 +103,22 @@ func (s *Simulation) Step(policy SchedulingPolicy) {
 		if next != nil {
 			s.RemoveFromReady(next)
 			s.AssignCPU(next)
+			s.emit(EventSelected, next.PID, s.explain(policy, next, nil))
 		}
 	}
+	s.captureSnapshot()
 	s.ExecuteCPU(policy.Quantum) // if quantum is 0 it will just ignore it and run until burst completion or preemption
 	s.Time++
+}
+
+func (s *Simulation) explain(policy SchedulingPolicy, selected *core.Process, previous *core.Process) string {
+	if policy.Explain != nil {
+		return policy.Explain(s, selected, previous)
+	}
+	if previous != nil {
+		return selected.PID + " preempted " + previous.PID
+	}
+	return selected.PID + " selected to run"
 }
 
 func Run(processes []core.Process, algorithm string, policy SchedulingPolicy) SimulationResult {
@@ -107,10 +135,7 @@ func (s *Simulation) CompleteCurrentBurstAt(p *core.Process, finishedAt int) {
 
 	// 2. Check if process is finished
 	if p.CurrentBurstIndex >= len(p.Bursts) {
-		p.Completed = true
-		p.State = core.StateTerminated
-		p.CompletionTime = finishedAt
-		s.CompletedProcesses++
+		s.finishProcess(p, finishedAt)
 		s.RunningProcess = nil
 		s.CurrentQuantumUsed = 0
 		return
@@ -123,11 +148,13 @@ func (s *Simulation) CompleteCurrentBurstAt(p *core.Process, finishedAt int) {
 	if next.Type == "IO" {
 		// move to IO queue
 		s.MoveToIO(p, next.Duration, finishedAt)
+		s.emit(EventIOStart, p.PID, p.PID+" started an I/O burst ("+strconv.Itoa(next.Duration)+" units)")
 	} else {
 		// go back to ready queue
 		p.State = core.StateReady
 		p.RemainingBurstTime = next.Duration
 		s.EnqueueReady(p)
+		s.emit(EventBurstDone, p.PID, p.PID+" finished a CPU burst and returned to the ready queue")
 	}
 
 	// 5. CPU becomes free
@@ -138,6 +165,16 @@ func (s *Simulation) CompleteCurrentBurstAt(p *core.Process, finishedAt int) {
 	      → IO wait
 	      → OR next CPU burst
 	      → OR process finished*/
+}
+
+// finishProcess marks a process as terminated, regardless of whether it
+// finished on a CPU burst or an I/O burst.
+func (s *Simulation) finishProcess(p *core.Process, finishedAt int) {
+	p.Completed = true
+	p.State = core.StateTerminated
+	p.CompletionTime = finishedAt
+	s.CompletedProcesses++
+	s.emit(EventCompleted, p.PID, p.PID+" completed all bursts")
 }
 
 func (s *Simulation) CompleteCurrentBurst(p *core.Process) {

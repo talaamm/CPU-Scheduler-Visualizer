@@ -6,6 +6,8 @@ type SimulationResult struct { // output of simulation, ready for visualization
 	Algorithm string `json:"algorithm"`
 
 	Timeline              []TimelineEntry `json:"timeline"`
+	Snapshots             []StateSnapshot `json:"snapshots"`
+	Events                []Event         `json:"events"`
 	Processes             []core.Process  `json:"processes"`
 	TotalTime             int             `json:"total_time"`
 	CPUuilization         float64         `json:"cpu_utilization"`

@@ -55,9 +55,9 @@ so it works even without the Go backend running.
 ## Vue 3 Component Structure (for build-step version)
 
 All files below are generated and working — copy `frontend/` into your repo,
-run `npm install`, then `npm run dev`. Note: the entry HTML for the Vite build
-is `index-vite.html` (rename to `index.html` if you don't need the standalone
-demo file alongside it — they can't both be named `index.html`).
+run `npm install`, then `npm run dev`. `frontend/index.html` is the Vite
+entry point; the standalone no-build-step demo lives separately at the repo
+root as `cpu-scheduler-visualizer.html`.
 
 src/
 ├── components/

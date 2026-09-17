@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -11,6 +12,56 @@ import (
 	"github.com/talaamm/cpu-scheduler-visualizer/algorithms"
 	"github.com/talaamm/cpu-scheduler-visualizer/core"
 )
+
+var validAlgorithms = map[string]bool{
+	"FCFS": true, "SJF": true, "SRTF": true,
+	"RR": true, "Round_Robin": true,
+	"Priority_NP": true, "Priority_P": true,
+}
+
+// validateProcesses rejects inputs that would produce a nonsensical or
+// hanging simulation: missing/duplicate PIDs, negative arrival times,
+// non-positive burst durations, unknown burst types, and processes that
+// don't start with a CPU burst (the engine assumes the first burst is what
+// gets scheduled onto the CPU).
+func validateProcesses(procs []ProcessDTO) error {
+	seen := make(map[string]bool, len(procs))
+	for _, p := range procs {
+		if p.PID == "" {
+			return fmt.Errorf("process is missing a pid")
+		}
+		if seen[p.PID] {
+			return fmt.Errorf("duplicate pid %q", p.PID)
+		}
+		seen[p.PID] = true
+
+		if p.ArrivalTime < 0 {
+			return fmt.Errorf("%s: arrival_time must be >= 0", p.PID)
+		}
+		if len(p.Bursts) == 0 {
+			continue // a burst-less process completes immediately on arrival; allowed
+		}
+		if p.Bursts[0].Type != string(core.CPUBurst) {
+			return fmt.Errorf("%s: first burst must be type CPU", p.PID)
+		}
+		for i, b := range p.Bursts {
+			if b.Type != string(core.CPUBurst) && b.Type != string(core.IOBurst) {
+				return fmt.Errorf("%s: burst %d has invalid type %q (must be CPU or IO)", p.PID, i, b.Type)
+			}
+			if b.Duration < 1 {
+				return fmt.Errorf("%s: burst %d duration must be >= 1", p.PID, i)
+			}
+		}
+	}
+	return nil
+}
+
+func validateAlgorithm(id string) error {
+	if !validAlgorithms[id] {
+		return fmt.Errorf("unknown algorithm %q", id)
+	}
+	return nil
+}
 
 // ─── Request / Response DTOs ────────────────────────────────────────────────
 
@@ -153,6 +204,14 @@ func handleSimulate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, "at least one process required")
 		return
 	}
+	if err := validateAlgorithm(req.Algorithm); err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validateProcesses(req.Processes); err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	procs := toCoreProcesses(req.Processes)
 	sched := schedulerFor(req.Algorithm, req.Quantum)
@@ -178,6 +237,16 @@ func handleCompare(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(req.Algorithms) == 0 {
 		jsonError(w, http.StatusBadRequest, "at least one algorithm required")
+		return
+	}
+	for _, alg := range req.Algorithms {
+		if err := validateAlgorithm(alg); err != nil {
+			jsonError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+	if err := validateProcesses(req.Processes); err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
