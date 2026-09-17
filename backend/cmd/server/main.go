@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/talaamm/cpu-scheduler-visualizer/algorithms"
 	"github.com/talaamm/cpu-scheduler-visualizer/core"
@@ -164,9 +165,49 @@ func schedulerFor(algorithm string, quantum int) algorithms.Scheduler {
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 
+// allowedOrigins is populated from the ALLOWED_ORIGINS env var (comma-separated).
+// When unset, it defaults to "*" so local development keeps working without
+// any configuration. In production, set ALLOWED_ORIGINS to the deployed
+// frontend's exact origin(s) so the API isn't open to arbitrary sites.
+var allowedOrigins = parseAllowedOrigins(os.Getenv("ALLOWED_ORIGINS"))
+
+func parseAllowedOrigins(raw string) []string {
+	if raw == "" {
+		return []string{"*"}
+	}
+	var origins []string
+	for _, o := range strings.Split(raw, ",") {
+		o = strings.TrimSpace(o)
+		if o != "" {
+			origins = append(origins, o)
+		}
+	}
+	if len(origins) == 0 {
+		return []string{"*"}
+	}
+	return origins
+}
+
+func isAllowedOrigin(origin string) (string, bool) {
+	for _, o := range allowedOrigins {
+		if o == "*" {
+			return "*", true
+		}
+		if o == origin {
+			return origin, true
+		}
+	}
+	return "", false
+}
+
 func cors(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		if allow, ok := isAllowedOrigin(r.Header.Get("Origin")); ok {
+			w.Header().Set("Access-Control-Allow-Origin", allow)
+			if allow != "*" {
+				w.Header().Set("Vary", "Origin")
+			}
+		}
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		if r.Method == http.MethodOptions {
@@ -445,8 +486,20 @@ func newMux() *http.ServeMux {
 func main() {
 	mux := newMux()
 
-	log.Println("CPU Scheduler API running on :8080")
-	if err := http.ListenAndServe(":8080", mux); err != nil {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080" // local development default
+	}
+
+	if len(allowedOrigins) == 1 && allowedOrigins[0] == "*" {
+		log.Println("ALLOWED_ORIGINS not set — CORS is open to all origins (fine for local dev, set it explicitly in production)")
+	} else {
+		log.Printf("CORS allowed origins: %v", allowedOrigins)
+	}
+
+	addr := ":" + port
+	log.Printf("CPU Scheduler API running on %s", addr)
+	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatal(err)
 	}
 }

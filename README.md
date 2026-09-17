@@ -4,6 +4,12 @@ An interactive Operating Systems simulator that visualizes how different CPU sch
 
 Give it a set of processes with CPU and I/O bursts, pick an algorithm, and step through the simulation tick by tick: which process is on the CPU, what's waiting in the ready queue, what's blocked on I/O, and *why* the scheduler made each decision.
 
+## Live Demo
+
+**[cpu-scheduler-visualizer.onrender.com](https://cpu-scheduler-visualizer.onrender.com)** *(fill in after deployment — see Deployment below)*
+
+The API is on Render's free tier, which spins down after 15 minutes of inactivity — the first request after a while may take 30-60s to wake it back up. The UI tells you when that's happening instead of just looking stuck.
+
 ## Why this exists
 
 Scheduling algorithms are easy to state ("run the shortest job next") and surprisingly easy to get subtly wrong in practice — tie-breaking, preemption timing, what happens when two processes arrive at the same instant, what happens when a process returns from I/O mid-quantum. I wanted a tool that would let me *see* those edge cases instead of tracing them by hand on paper, and that demonstrates the full backend-simulation-to-frontend-visualization pipeline, not just a scheduling algorithm in isolation.
@@ -80,6 +86,28 @@ At every tick the engine records a **state snapshot** (exact ready queue, I/O qu
 Building the shared-engine-plus-pluggable-policy design paid off: once FCFS's engine plumbing (arrivals, I/O queue, ready queue, metrics) was correct, SJF/SRTF/RR/Priority were each only a few lines of selection logic. I verified all six against hand-worked Gantt traces (`tests/run-example/`) before trusting them, then locked that in as automated golden-trace tests.
 
 The most interesting bug I found: a process whose **last** burst is I/O (rather than CPU) was silently dropped by the engine instead of being marked complete, which made the simulation loop forever. It only showed up because I was validating an edge case the textbook examples don't cover — a good reminder that "matches the textbook trace" and "correct for all valid input" aren't the same thing.
+
+A second one showed up while stress-testing the UI before deployment: re-running a simulation while a previous one's Gantt-chart animation was still playing leaked a `setInterval` — the playback store cleared the `isPlaying` flag but never actually cancelled the timer, so each leaked interval kept ticking the clock forward on its own. Fixed by routing every reset through the same `pause()` path that owns the interval handle, instead of duplicating that cleanup inline.
+
+## Deployment
+
+```
+Browser
+   │
+   ▼
+Static frontend (Render Static Site)        Vue 3 build output, served over HTTPS
+   │  fetch() → VITE_API_URL
+   ▼
+Go REST API (Render Web Service, free tier) same engine as local dev, PORT from env
+```
+
+Both services deploy from this repo via the `render.yaml` Blueprint — one Render account, no credit card, auto-deploy on every push to `main`:
+
+- **Frontend** — Render Static Site, builds `frontend/` with `npm install && npm run build`, serves `frontend/dist`. `VITE_API_URL` is baked in at build time.
+- **Backend** — Render Web Service (free), builds the Go binary, listens on the `PORT` Render assigns. `ALLOWED_ORIGINS` locks CORS down to the deployed frontend's exact origin (wide-open `*` is only the local-dev default).
+- **No database** — the simulator is stateless; every request computes a fresh result.
+
+The free web service spins down after 15 minutes idle (a cold request takes 30-60s to wake it) — expected for a low-traffic portfolio demo, not a bug. The app surfaces this in the UI rather than looking broken.
 
 ## Running it locally
 

@@ -41,6 +41,9 @@
     </div>
 
     <div class="left-panel-footer">
+      <div v-if="isLoading && isSlow" class="wake-hint">
+        Waking up the backend — free hosting spins it down when idle, this can take up to a minute on the first request.
+      </div>
       <button class="run-btn" :disabled="isLoading" @click="$emit('run')">
         <span v-if="isLoading" class="spinner" />
         {{ isLoading ? 'Simulating…' : '▶  Run Simulation' }}
@@ -62,6 +65,7 @@ const meta = useMetaStore()
 
 defineProps<{
   isLoading: boolean
+  isSlow: boolean
   errorMessage: string | null
 }>()
 
@@ -145,6 +149,17 @@ const needsPriority = computed(
   color: #fca5a5;
   font-size: 11px;
   margin-top: 12px;
+  padding: 8px 10px;
+}
+
+.wake-hint {
+  background: rgba(245,158,11,0.08);
+  border: 1px solid rgba(245,158,11,0.25);
+  border-radius: 6px;
+  color: #fbbf24;
+  font-size: 10px;
+  line-height: 1.4;
+  margin-bottom: 8px;
   padding: 8px 10px;
 }
 

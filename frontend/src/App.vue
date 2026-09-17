@@ -15,7 +15,12 @@
     </div>
 
     <div class="app-body">
-      <LeftPanel :is-loading="sim.isLoading" :error-message="sim.error" @run="handleRun" />
+      <LeftPanel
+        :is-loading="sim.isLoading"
+        :is-slow="sim.isSlowToRespond"
+        :error-message="sim.error"
+        @run="handleRun"
+      />
 
       <div class="main-canvas">
         <ViewTabs

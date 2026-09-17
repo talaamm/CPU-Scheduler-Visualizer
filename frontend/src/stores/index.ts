@@ -120,6 +120,7 @@ export const useBuilderStore = defineStore('builder', () => {
 export const useSimulationStore = defineStore('simulation', () => {
   const result = ref<SimulationResult | null>(null)
   const isLoading = ref(false)
+  const isSlowToRespond = ref(false) // true once a request has been pending a while — the free-tier backend may be waking from sleep
   const error = ref<string | null>(null)
 
   // Animation state
@@ -148,10 +149,18 @@ export const useSimulationStore = defineStore('simulation', () => {
   let playInterval: ReturnType<typeof setInterval> | null = null
 
   async function run(builder: ReturnType<typeof useBuilderStore>) {
+    pause() // clears any playback interval still running from a previous simulation
     isLoading.value = true
+    isSlowToRespond.value = false
     error.value = null
     currentTime.value = 0
-    isPlaying.value = false
+
+    // The free-tier backend spins down after 15 minutes idle and can take
+    // 30-60s to wake up on the next request. Surface that after a few
+    // seconds so it reads as "waking up", not "broken".
+    const slowTimer = setTimeout(() => {
+      isSlowToRespond.value = true
+    }, 4000)
 
     try {
       result.value = await api.simulate({
@@ -162,7 +171,9 @@ export const useSimulationStore = defineStore('simulation', () => {
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Simulation failed'
     } finally {
+      clearTimeout(slowTimer)
       isLoading.value = false
+      isSlowToRespond.value = false
     }
   }
 
@@ -214,6 +225,7 @@ export const useSimulationStore = defineStore('simulation', () => {
   return {
     result,
     isLoading,
+    isSlowToRespond,
     error,
     currentTime,
     isPlaying,
