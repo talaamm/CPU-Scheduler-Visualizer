@@ -30,6 +30,33 @@ export interface TimelineEntry {
   event: 'RUNNING' | 'IDLE' | 'READY' | 'WAITING' | 'TERMINATED'
 }
 
+/** Ground-truth system state for a single time tick, as computed by the Go engine. */
+export interface StateSnapshot {
+  time: number
+  running: string // "" means CPU is idle
+  running_remaining: number
+  running_burst_total: number
+  ready_queue: string[]
+  io_queue: Array<{ pid: string; remaining: number }>
+}
+
+export type ScheduleEventType =
+  | 'ARRIVED'
+  | 'SELECTED'
+  | 'PREEMPTED'
+  | 'BURST_DONE'
+  | 'IO_START'
+  | 'IO_DONE'
+  | 'COMPLETED'
+
+/** An algorithm-sourced explanation of a scheduling decision or transition. */
+export interface ScheduleEvent {
+  time: number
+  type: ScheduleEventType
+  pid: string
+  message: string
+}
+
 export interface ProcessResult {
   pid: string
   arrival_time: number
@@ -47,6 +74,8 @@ export interface ProcessResult {
 export interface SimulationResult {
   algorithm: string
   timeline: TimelineEntry[]
+  snapshots: StateSnapshot[]
+  events: ScheduleEvent[]
   processes: ProcessResult[]
   total_time: number
   cpu_utilization: number
@@ -114,8 +143,10 @@ export interface ProcessGanttRow {
 export interface SimulationFrame {
   time: number
   runningPid: string | null
+  runningRemaining: number
+  runningBurstTotal: number
   readyQueue: string[]
   ioQueue: Array<{ pid: string; remainingIO: number }>
   completedPids: string[]
-  eventLog: string[]
+  eventLog: Array<{ time: number; text: string; color: string }>
 }

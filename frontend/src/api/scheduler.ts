@@ -19,11 +19,24 @@ class APIError extends Error {
   }
 }
 
+// A fetch() network failure (backend unreachable, CORS blocked, etc.) throws
+// a generic TypeError whose message is just "Failed to fetch" — not useful
+// to someone who forgot to start the Go server. Give them something
+// actionable instead.
+function unreachableBackendError(): APIError {
+  return new APIError(
+    0,
+    `Can't reach the backend at ${BASE_URL}. Make sure it's running: go run ./backend/cmd/server`,
+  )
+}
+
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+  }).catch(() => {
+    throw unreachableBackendError()
   })
 
   if (!res.ok) {
@@ -35,7 +48,9 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`)
+  const res = await fetch(`${BASE_URL}${path}`).catch(() => {
+    throw unreachableBackendError()
+  })
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Unknown error' }))
@@ -83,13 +98,7 @@ export const api = {
 
 // ─── Derived data helpers (pure, no HTTP) ────────────────────────────────────
 
-import type {
-  GanttSegment,
-  ProcessGanttRow,
-  SimulationFrame,
-  TimelineEntry,
-  ProcessResult,
-} from '@/types'
+import type { GanttSegment, SimulationFrame, ProcessResult } from '@/types'
 
 /** Process colors — cycle through palette for N processes */
 const PROCESS_COLORS = [
@@ -130,121 +139,64 @@ export function toGanttSegments(result: SimulationResult): GanttSegment[] {
 }
 
 /**
- * Build per-process Gantt rows showing CPU, IO wait, and idle stretches.
- * This requires the full ProcessResult array for IO burst durations.
- */
-export function toProcessGanttRows(result: SimulationResult): ProcessGanttRow[] {
-  const { processes, timeline, total_time } = result
-
-  return processes.map((proc, idx) => {
-    const color = processColor(idx)
-    const segments: ProcessGanttRow['segments'] = []
-
-    // Find all CPU segments for this process
-    const cpuEntries = timeline.filter((e) => e.process_id === proc.pid)
-
-    for (let t = proc.arrival_time; t < total_time; ) {
-      const cpuAt = cpuEntries.find((e) => {
-        const nextIdx = timeline.indexOf(e) + 1
-        const end = nextIdx < timeline.length ? timeline[nextIdx].time : total_time
-        return e.time <= t && t < end
-      })
-
-      if (cpuAt) {
-        const idx2 = timeline.indexOf(cpuAt)
-        const end = idx2 + 1 < timeline.length ? timeline[idx2 + 1].time : total_time
-        segments.push({ start: t, end, type: 'cpu' })
-        t = end
-      } else {
-        // Check if in IO or just waiting
-        const burst = getIOBurstAt(proc, t)
-        if (burst) {
-          segments.push({ start: t, end: t + 1, type: 'io' })
-        } else if (t >= proc.arrival_time) {
-          segments.push({ start: t, end: t + 1, type: 'waiting' })
-        }
-        t++
-      }
-    }
-
-    return { pid: proc.pid, color, segments: mergeAdjacent(segments) }
-  })
-}
-
-function getIOBurstAt(proc: ProcessResult, _t: number): boolean {
-  // Simplified: just checks if process has IO bursts (full impl needs IO queue tracking)
-  return proc.bursts.some((b) => b.type === 'IO')
-}
-
-function mergeAdjacent(segs: ProcessGanttRow['segments']): ProcessGanttRow['segments'] {
-  if (segs.length === 0) return segs
-  const merged = [segs[0]]
-  for (let i = 1; i < segs.length; i++) {
-    const last = merged[merged.length - 1]
-    if (last.type === segs[i].type && last.end === segs[i].start) {
-      last.end = segs[i].end
-    } else {
-      merged.push(segs[i])
-    }
-  }
-  return merged
-}
-
-/**
- * Reconstruct simulation frames for step-by-step animation.
- * Each frame represents the system state at time t.
+ * Reconstruct simulation frames for step-by-step animation directly from the
+ * engine's real per-tick snapshots and events — no guessing about queue
+ * membership or burst progress.
  */
 export function buildSimulationFrames(
   result: SimulationResult,
   processes: ProcessResult[],
 ): SimulationFrame[] {
+  const { snapshots, events, total_time } = result
+
+  const pidIndex: Record<string, number> = {}
+  processes.forEach((p, i) => {
+    pidIndex[p.pid] = i
+  })
+  const colorFor = (pid: string) => processColor(pidIndex[pid] ?? 0)
+
+  const snapshotAt = new Map(snapshots.map((s) => [s.time, s]))
+
   const frames: SimulationFrame[] = []
-  const { timeline, total_time } = result
+  let last = snapshots[0]
 
   for (let t = 0; t <= total_time; t++) {
-    // Find running process at time t
-    let runningPid: string | null = null
-    for (let i = timeline.length - 1; i >= 0; i--) {
-      if (timeline[i].time <= t) {
-        runningPid = timeline[i].process_id === 'IDLE' ? null : timeline[i].process_id
-        break
-      }
-    }
+    const snap = snapshotAt.get(t) ?? last
+    if (snap) last = snap
 
-    // Determine ready queue (arrived, not running, not completed yet)
-    const readyQueue: string[] = []
-    const ioQueue: Array<{ pid: string; remainingIO: number }> = []
-    const completedPids: string[] = []
-    const eventLog: string[] = []
+    const completedPids = processes
+      .filter((p) => p.completed && p.completion_time <= t)
+      .map((p) => p.pid)
 
-    for (const proc of processes) {
-      if (proc.arrival_time > t) continue
-      if (proc.completion_time <= t && proc.completed) {
-        completedPids.push(proc.pid)
-        continue
-      }
-      if (proc.pid === runningPid) continue
-      readyQueue.push(proc.pid)
-    }
+    const eventLog = events
+      .filter((e) => e.time <= t)
+      .slice(-30)
+      .reverse()
+      .map((e) => ({
+        time: e.time,
+        text: e.message,
+        color: e.type === 'COMPLETED' ? '#22C55E' : colorFor(e.pid),
+      }))
 
-    // Event log for this tick
-    const tickEntry = timeline.find((e) => e.time === t)
-    if (tickEntry) {
-      if (tickEntry.process_id === 'IDLE') {
-        eventLog.push(`t=${t}  CPU idle — no processes ready`)
-      } else {
-        eventLog.push(`t=${t}  ${tickEntry.process_id} running on CPU`)
-      }
-    }
-
-    frames.push({ time: t, runningPid, readyQueue, ioQueue, completedPids, eventLog })
+    frames.push({
+      time: t,
+      runningPid: snap?.running || null,
+      runningRemaining: snap?.running_remaining ?? 0,
+      runningBurstTotal: snap?.running_burst_total ?? 0,
+      readyQueue: snap?.ready_queue ?? [],
+      ioQueue: (snap?.io_queue ?? []).map((e) => ({ pid: e.pid, remainingIO: e.remaining })),
+      completedPids,
+      eventLog,
+    })
   }
 
   return frames
 }
 
 /**
- * Generate a "why was this decision made?" explanation for a Gantt segment.
+ * Look up the engine's own explanation for why a Gantt segment's process was
+ * scheduled at that time (sourced from the algorithm's real selection logic,
+ * not reconstructed after the fact).
  */
 export function explainDecision(
   segment: GanttSegment,
@@ -255,25 +207,15 @@ export function explainDecision(
     return 'CPU is idle — no processes are in the ready queue at this time. All active processes are waiting on I/O.'
   }
 
-  const pid = segment.pid
-  const proc = result.processes.find((p) => p.pid === pid)
-  if (!proc) return ''
+  const match = result.events.find(
+    (e) =>
+      e.time === segment.start &&
+      e.pid === segment.pid &&
+      (e.type === 'SELECTED' || e.type === 'PREEMPTED'),
+  )
+  if (match) return match.message
 
-  switch (algorithm) {
-    case 'FCFS':
-      return `${pid} was selected because it arrived before all other ready processes (FCFS order).`
-    case 'SJF':
-      return `${pid} was selected because it had the shortest next CPU burst among ready processes.`
-    case 'SRTF':
-      return `${pid} was selected because it had the least remaining burst time (${proc.bursts[0]?.duration ?? '?'} units) at t=${segment.start}.`
-    case 'Round_Robin':
-      return `${pid} received its time quantum at t=${segment.start}. Round Robin ensures each process gets equal CPU time.`
-    case 'Priority_Non_Preemptive':
-    case 'Priority_Preemptive':
-      return `${pid} was selected because it had the highest priority (value=${proc.priority}) among ready processes. Lower number = higher priority.`
-    default:
-      return `${pid} was scheduled at t=${segment.start}.`
-  }
+  return `${segment.pid} continues running at t=${segment.start} under ${algorithm.replace(/_/g, ' ')}.`
 }
 
 export { APIError }

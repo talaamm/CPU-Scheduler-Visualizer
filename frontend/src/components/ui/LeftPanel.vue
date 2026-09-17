@@ -11,10 +11,10 @@
         :show-priority="needsPriority"
         @toggle="builder.toggleExpanded(proc.pid)"
         @remove="builder.removeProcess(proc.pid)"
-        @update="(field, value) => builder.updateProcess(proc.pid, { [field]: value })"
-        @add-burst="(type) => builder.addBurst(proc.pid, type)"
-        @remove-burst="(i) => builder.removeBurst(proc.pid, i)"
-        @update-burst="(i, dur) => builder.updateBurstDuration(proc.pid, i, dur)"
+        @update="(field, value) => builder.updateProcess(proc.pid, { [field]: value } as Partial<Process>)"
+        @add-burst="(type: 'CPU' | 'IO') => builder.addBurst(proc.pid, type)"
+        @remove-burst="(i: number) => builder.removeBurst(proc.pid, i)"
+        @update-burst="(i: number, dur: number) => builder.updateBurstDuration(proc.pid, i, dur)"
       />
       <button class="add-process-btn" @click="builder.addProcess()">＋ Add Process</button>
 
@@ -50,10 +50,12 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useBuilderStore, useMetaStore } from '@/stores'
 import { processColor } from '@/api/scheduler'
-import ProcessCard from './ProcessCard.vue'
-import AlgorithmSelector from './AlgorithmSelector.vue'
+import type { Process } from '@/types'
+import ProcessCard from '../builder/ProcessCard.vue'
+import AlgorithmSelector from '../builder/AlgorithmSelector.vue'
 
 const builder = useBuilderStore()
 const meta = useMetaStore()
@@ -67,7 +69,9 @@ defineEmits<{
   run: []
 }>()
 
-const needsPriority = builder.selectedAlgorithm === 'Priority_NP' || builder.selectedAlgorithm === 'Priority_P'
+const needsPriority = computed(
+  () => builder.selectedAlgorithm === 'Priority_NP' || builder.selectedAlgorithm === 'Priority_P',
+)
 </script>
 
 <style scoped>

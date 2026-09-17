@@ -28,10 +28,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { SimulationResult } from '@/types'
-import { processColor } from '@/api/scheduler'
+import { processColor, buildSimulationFrames } from '@/api/scheduler'
 import ReadyQueue from './ReadyQueue.vue'
 import IOQueue from './IOQueue.vue'
-import EventLog, { type LogEntry } from './EventLog.vue'
+import EventLog from './EventLog.vue'
 
 const props = defineProps<{
   result: SimulationResult
@@ -47,83 +47,26 @@ function colorFor(pid: string) {
   return processColor(pidIndex.value[pid] ?? 0)
 }
 
-const runningPid = computed<string | null>(() => {
-  const { timeline } = props.result
-  for (let i = timeline.length - 1; i >= 0; i--) {
-    if (timeline[i].time <= props.currentTime) {
-      return timeline[i].process_id === 'IDLE' ? null : timeline[i].process_id
-    }
-  }
-  return null
-})
+// Frames are derived from the engine's real per-tick snapshots/events — the
+// ready queue, I/O queue, and burst progress below all reflect actual
+// simulation state, not a post-hoc guess.
+const frames = computed(() => buildSimulationFrames(props.result, props.result.processes))
+const frame = computed(() => frames.value[Math.min(props.currentTime, frames.value.length - 1)] ?? null)
 
-// Best-effort IO detection: a process that has appeared on CPU, isn't running
-// now, and hasn't completed is assumed to be in IO wait.
-function isLikelyInIO(pid: string): boolean {
-  const { timeline, total_time, processes } = props.result
-  const proc = processes.find((p) => p.pid === pid)
-  if (!proc) return false
-  if (proc.completion_time <= props.currentTime) return false
-
-  const cpuAppearances = timeline.filter((e) => e.process_id === pid)
-  if (cpuAppearances.length === 0) return false
-
-  const lastEntry = cpuAppearances[cpuAppearances.length - 1]
-  const idx = timeline.indexOf(lastEntry)
-  const lastEnd = idx + 1 < timeline.length ? timeline[idx + 1].time : total_time
-  return lastEnd <= props.currentTime
-}
-
-const readyPids = computed(() => {
-  const t = props.currentTime
-  return props.result.processes
-    .filter((p) => p.arrival_time <= t && p.completion_time > t && p.pid !== runningPid.value)
-    .filter((p) => !isLikelyInIO(p.pid))
-    .map((p) => p.pid)
-})
-
-const ioEntries = computed(() => {
-  const t = props.currentTime
-  return props.result.processes
-    .filter((p) => p.arrival_time <= t && p.completion_time > t && p.pid !== runningPid.value)
-    .filter((p) => isLikelyInIO(p.pid))
-    .map((p) => ({ pid: p.pid }))
-})
+const runningPid = computed(() => frame.value?.runningPid ?? null)
+const readyPids = computed(() => frame.value?.readyQueue ?? [])
+const ioEntries = computed(() =>
+  (frame.value?.ioQueue ?? []).map((e) => ({ pid: e.pid, remainingIO: e.remainingIO })),
+)
 
 const burstProgress = computed(() => {
-  // Rough visual indicator only — real progress needs per-burst remaining time
-  return 55
+  const f = frame.value
+  if (!f || !f.runningBurstTotal) return 0
+  const elapsed = f.runningBurstTotal - f.runningRemaining
+  return Math.min(100, Math.max(0, (elapsed / f.runningBurstTotal) * 100))
 })
 
-const logEntries = computed<LogEntry[]>(() => {
-  const { timeline, processes } = props.result
-  const t = props.currentTime
-  const entries: LogEntry[] = []
-
-  for (const e of timeline) {
-    if (e.time > t) break
-    if (e.process_id === 'IDLE') {
-      entries.push({ time: e.time, text: 'CPU idle — no ready processes', color: '#475569' })
-    } else {
-      entries.push({
-        time: e.time,
-        text: `${e.process_id} scheduled on CPU`,
-        color: colorFor(e.process_id),
-      })
-    }
-  }
-
-  for (const p of processes) {
-    if (p.arrival_time <= t) {
-      entries.push({ time: p.arrival_time, text: `${p.pid} arrived`, color: colorFor(p.pid) })
-    }
-    if (p.completed && p.completion_time <= t) {
-      entries.push({ time: p.completion_time, text: `${p.pid} completed`, color: '#22C55E' })
-    }
-  }
-
-  return entries.sort((a, b) => b.time - a.time).slice(0, 10)
-})
+const logEntries = computed(() => frame.value?.eventLog.slice(0, 10) ?? [])
 </script>
 
 <style scoped>
