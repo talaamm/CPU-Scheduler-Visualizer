@@ -1,0 +1,1964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CPU Scheduler Visualizer</title>
+<style>
+  /* ── Reset & Base ─────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0F1117;
+    --surface:   #1A1D27;
+    --surface2:  #222535;
+    --border:    #2E3348;
+    --blue:      #4F8EF7;
+    --purple:    #9B6DFF;
+    --teal:      #2DD4BF;
+    --amber:     #F59E0B;
+    --pink:      #F472B6;
+    --green:     #22C55E;
+    --orange:    #FB923C;
+    --violet:    #A78BFA;
+    --text:      #F1F5F9;
+    --text2:     #94A3B8;
+    --text3:     #475569;
+    --idle:      #334155;
+    --radius:    10px;
+    --radius-sm: 6px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Typography ──────────────────────────────────────────────── */
+  .mono { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+  .text2 { color: var(--text2); }
+  .text3 { color: var(--text3); }
+  label { color: var(--text2); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+
+  /* ── Layout ──────────────────────────────────────────────────── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 20px;
+    height: 48px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--surface);
+  }
+  .topbar-logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: -0.02em;
+  }
+  .topbar-logo .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 8px var(--blue); }
+  .topbar-spacer { flex: 1; }
+  .topbar-mode { display: flex; gap: 4px; }
+
+  .app-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── Left Panel ──────────────────────────────────────────────── */
+  .left-panel {
+    width: 280px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .left-panel-scroll { flex: 1; overflow-y: auto; padding: 16px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+  .left-panel-footer { padding: 12px 16px; border-top: 1px solid var(--border); }
+
+  .section-label {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 8px;
+    margin-top: 16px;
+  }
+  .section-label:first-child { margin-top: 0; }
+
+  /* ── Process Card ────────────────────────────────────────────── */
+  .process-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .process-card:hover { border-color: #3d4460; }
+  .process-card.expanded { border-color: var(--blue); }
+
+  .process-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .process-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .process-pid {
+    font-weight: 600;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .process-bursts-preview {
+    display: flex;
+    gap: 3px;
+    flex: 1;
+    overflow: hidden;
+  }
+  .burst-chip {
+    font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 1px 5px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .burst-chip.cpu { background: rgba(79,142,247,0.15); color: #4F8EF7; border: 1px solid rgba(79,142,247,0.3); }
+  .burst-chip.io  { background: rgba(45,212,191,0.12); color: #2DD4BF; border: 1px solid rgba(45,212,191,0.25); }
+
+  .btn-remove {
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+  }
+  .btn-remove:hover { color: #f87171; background: rgba(248,113,113,0.1); }
+
+  .process-body {
+    padding: 10px;
+    border-top: 1px solid var(--border);
+  }
+
+  .input-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .input-field {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 5px 8px;
+    width: 100%;
+    transition: border-color 0.15s;
+    outline: none;
+  }
+  .input-field:focus { border-color: var(--blue); }
+  .input-group { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+
+  .bursts-row { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; align-items: center; }
+  .burst-edit-chip {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    border-radius: 5px;
+    padding: 3px 6px;
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    cursor: default;
+  }
+  .burst-edit-chip.cpu { background: rgba(79,142,247,0.12); border: 1px solid rgba(79,142,247,0.3); }
+  .burst-edit-chip.io  { background: rgba(45,212,191,0.10); border: 1px solid rgba(45,212,191,0.25); }
+  .burst-edit-chip span { color: var(--text2); font-size: 9px; }
+  .burst-duration-input {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    width: 24px;
+    text-align: center;
+    outline: none;
+  }
+  .burst-remove {
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 0 1px;
+    line-height: 1;
+  }
+  .burst-remove:hover { color: #f87171; }
+  .add-burst-btn {
+    background: none;
+    border: 1px dashed var(--border);
+    border-radius: 5px;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 10px;
+    padding: 3px 7px;
+    transition: all 0.15s;
+  }
+  .add-burst-btn:hover { border-color: var(--blue); color: var(--blue); }
+
+  /* ── Algorithm Selector ───────────────────────────────────────── */
+  .algo-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .algo-option:hover { background: var(--surface2); }
+  .algo-option.selected { background: rgba(79,142,247,0.1); }
+  .algo-radio {
+    width: 13px; height: 13px; border-radius: 50%;
+    border: 2px solid var(--border);
+    flex-shrink: 0;
+    transition: border-color 0.15s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .algo-option.selected .algo-radio { border-color: var(--blue); }
+  .algo-radio-inner {
+    width: 5px; height: 5px; border-radius: 50%; background: var(--blue);
+    transform: scale(0); transition: transform 0.15s;
+  }
+  .algo-option.selected .algo-radio-inner { transform: scale(1); }
+  .algo-name { font-size: 12px; font-weight: 500; }
+  .algo-badge {
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.06);
+    color: var(--text3);
+    margin-left: auto;
+  }
+
+  .quantum-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px 4px 30px;
+    margin-top: -4px;
+  }
+  .quantum-label { font-size: 11px; color: var(--text3); }
+  .quantum-input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 3px 6px;
+    width: 48px;
+    outline: none;
+    text-align: center;
+  }
+  .quantum-input:focus { border-color: var(--blue); }
+
+  /* ── Presets ────────────────────────────────────────────────────── */
+  .presets-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .preset-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text2);
+    cursor: pointer;
+    font-size: 10px;
+    padding: 6px 8px;
+    text-align: left;
+    transition: all 0.15s;
+    line-height: 1.3;
+  }
+  .preset-btn:hover { border-color: var(--blue); color: var(--text); }
+  .preset-btn strong { display: block; font-size: 11px; color: var(--text); margin-bottom: 2px; }
+
+  /* ── Run Button ──────────────────────────────────────────────────── */
+  .run-btn {
+    width: 100%;
+    background: var(--blue);
+    border: none;
+    border-radius: var(--radius);
+    color: white;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    padding: 11px;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .run-btn:hover { background: #6ba0fa; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(79,142,247,0.35); }
+  .run-btn:active { transform: none; }
+  .run-btn:disabled { background: var(--surface2); color: var(--text3); cursor: not-allowed; transform: none; box-shadow: none; }
+  .run-btn .spinner {
+    width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite;
+  }
+
+  /* ── Main Canvas ────────────────────────────────────────────────── */
+  .main-canvas {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .view-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+  .view-tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text2);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 12px 16px;
+    transition: all 0.15s;
+    margin-bottom: -1px;
+  }
+  .view-tab:hover { color: var(--text); }
+  .view-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+  .view-content {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Playback Bar ────────────────────────────────────────────────── */
+  .playback-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+  .pb-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 5px 9px;
+    transition: all 0.12s;
+  }
+  .pb-btn:hover { background: var(--border); }
+  .pb-btn.active { background: var(--blue); border-color: var(--blue); }
+  .pb-time { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text2); min-width: 64px; }
+  .pb-scrubber {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--surface2);
+    outline: none;
+    cursor: pointer;
+  }
+  .pb-scrubber::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--blue);
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 6px rgba(79,142,247,0.5);
+  }
+  .speed-select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text2);
+    font-size: 11px;
+    padding: 4px 6px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  /* ── Gantt Chart ─────────────────────────────────────────────────── */
+  .gantt-view { flex: 1; overflow: auto; padding: 20px; }
+  .gantt-container { min-width: 600px; }
+
+  .gantt-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+    gap: 10px;
+  }
+  .gantt-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    width: 40px;
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .gantt-track { flex: 1; position: relative; height: 28px; }
+  .gantt-seg {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: filter 0.1s, opacity 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .gantt-seg:hover { filter: brightness(1.2); z-index: 10; }
+  .gantt-seg.future { opacity: 0.25; }
+  .gantt-seg.idle { background: var(--idle); border: 1px dashed var(--border); color: var(--text3); }
+
+  .gantt-axis {
+    display: flex;
+    margin-left: 50px;
+    position: relative;
+    height: 20px;
+    margin-top: 4px;
+  }
+  .gantt-tick {
+    position: absolute;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text3);
+  }
+  .gantt-cursor {
+    position: absolute;
+    top: 0;
+    width: 2px;
+    background: var(--blue);
+    box-shadow: 0 0 8px var(--blue);
+    pointer-events: none;
+    border-radius: 1px;
+    z-index: 20;
+    transition: left 0.1s;
+  }
+  .gantt-tracks-wrap { position: relative; }
+
+  /* CPU bar at bottom of Gantt */
+  .cpu-row-label { font-size: 10px; color: var(--text3); width: 40px; text-align: right; flex-shrink: 0; }
+
+  /* ── Tooltip ──────────────────────────────────────────────────────── */
+  .tooltip {
+    position: fixed;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    font-size: 11px;
+    max-width: 260px;
+    line-height: 1.5;
+    color: var(--text2);
+    pointer-events: none;
+    z-index: 9999;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    transition: opacity 0.1s;
+  }
+  .tooltip-header { font-weight: 700; color: var(--text); font-family: 'JetBrains Mono', monospace; margin-bottom: 4px; font-size: 12px; }
+
+  /* ── Live Simulation View ─────────────────────────────────────────── */
+  .live-view { flex: 1; overflow: auto; padding: 20px; }
+  .live-grid {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 16px;
+    align-items: start;
+    margin-bottom: 20px;
+  }
+  .queue-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+  }
+  .queue-title {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 12px;
+  }
+  .queue-slots {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 60px;
+  }
+  .queue-empty { color: var(--text3); font-size: 11px; font-style: italic; text-align: center; padding: 12px; }
+  .queue-process-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    animation: slideIn 0.25s ease-out;
+  }
+
+  .cpu-panel {
+    background: var(--surface);
+    border: 1px solid var(--blue);
+    border-radius: var(--radius);
+    padding: 14px;
+    min-width: 160px;
+    text-align: center;
+    box-shadow: 0 0 20px rgba(79,142,247,0.1);
+  }
+  .cpu-panel.idle { border-color: var(--border); box-shadow: none; }
+  .cpu-title { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); margin-bottom: 12px; }
+  .cpu-process {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 4px;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  .cpu-idle-text { color: var(--text3); font-size: 13px; }
+  .cpu-burst-bar {
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+  .cpu-burst-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--blue);
+    transition: width 0.3s;
+  }
+
+  /* ── Event Log ────────────────────────────────────────────────────── */
+  .event-log {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .event-log-title { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); margin-bottom: 10px; }
+  .event-entry {
+    display: flex;
+    gap: 10px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text2);
+  }
+  .event-entry:last-child { border-bottom: none; }
+  .event-time { color: var(--text3); flex-shrink: 0; width: 40px; }
+
+  /* ── Metrics View ─────────────────────────────────────────────────── */
+  .metrics-view { flex: 1; overflow: auto; padding: 20px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .kpi-label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
+  .kpi-value { font-family: 'JetBrains Mono', monospace; font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+  .kpi-sub { font-size: 10px; color: var(--text3); }
+
+  .metrics-table {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .metrics-table table { width: 100%; border-collapse: collapse; }
+  .metrics-table th {
+    background: var(--surface2);
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text3);
+    font-weight: 600;
+  }
+  .metrics-table td {
+    padding: 10px 14px;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .metrics-table tr:hover td { background: var(--surface2); }
+
+  /* ── Compare View ─────────────────────────────────────────────────── */
+  .compare-view { flex: 1; overflow: auto; padding: 20px; }
+  .compare-algo-picker {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .algo-pill {
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--text2);
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 5px 12px;
+    transition: all 0.15s;
+    background: none;
+  }
+  .algo-pill.selected {
+    border-color: var(--blue);
+    color: white;
+    background: rgba(79,142,247,0.15);
+  }
+
+  .compare-run-btn {
+    background: var(--purple);
+    border: none;
+    border-radius: var(--radius);
+    color: white;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 7px 16px;
+    transition: all 0.15s;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .compare-run-btn:hover { background: #b07fff; }
+
+  .compare-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .chart-title { font-size: 11px; font-weight: 600; color: var(--text2); margin-bottom: 14px; }
+  .bar-chart { display: flex; flex-direction: column; gap: 8px; }
+  .bar-row { display: flex; align-items: center; gap: 10px; }
+  .bar-algo-name { font-size: 11px; font-family: 'JetBrains Mono', monospace; width: 90px; flex-shrink: 0; color: var(--text2); }
+  .bar-track { flex: 1; height: 16px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s cubic-bezier(0.34, 1.2, 0.64, 1); }
+  .bar-value { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text3); width: 36px; text-align: right; flex-shrink: 0; }
+
+  .ranking-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    grid-column: span 2;
+  }
+  .rank-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .rank-row:last-child { border-bottom: none; }
+  .rank-medal { font-size: 16px; width: 24px; }
+  .rank-name { flex: 1; font-weight: 500; }
+  .rank-stat { font-family: 'JetBrains Mono', monospace; color: var(--text3); font-size: 11px; }
+
+  /* ── Empty State ────────────────────────────────────────────────────── */
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--text3);
+  }
+  .empty-icon { font-size: 48px; opacity: 0.3; }
+  .empty-title { font-size: 16px; font-weight: 600; color: var(--text2); }
+  .empty-sub { font-size: 12px; }
+
+  /* ── Mode Toggle ─────────────────────────────────────────────────────── */
+  .mode-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text2);
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 5px 12px;
+    transition: all 0.15s;
+  }
+  .mode-btn.active { background: var(--blue); border-color: var(--blue); color: white; }
+  .mode-btn:hover:not(.active) { border-color: var(--text2); color: var(--text); }
+
+  .error-banner {
+    background: rgba(248,113,113,0.1);
+    border: 1px solid rgba(248,113,113,0.3);
+    border-radius: var(--radius-sm);
+    color: #fca5a5;
+    font-size: 11px;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+  }
+
+  /* ── Animations ─────────────────────────────────────────────────────── */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-12px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.7; }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .fade-in { animation: fadeIn 0.3s ease-out; }
+
+  .add-process-btn {
+    width: 100%;
+    background: none;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 8px;
+    transition: all 0.15s;
+    margin-top: 4px;
+  }
+  .add-process-btn:hover { border-color: var(--blue); color: var(--blue); }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div class="topbar-logo">
+      <div class="dot"></div>
+      CPU Scheduler Visualizer
+    </div>
+    <div style="margin-left:8px; color:var(--text3); font-size:11px;" id="algo-badge"></div>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-mode">
+      <button class="mode-btn active" id="mode-single" onclick="setMode('single')">Single</button>
+      <button class="mode-btn" id="mode-compare" onclick="setMode('compare')">Compare</button>
+    </div>
+  </div>
+
+  <!-- App Body -->
+  <div class="app-body">
+
+    <!-- Left Panel -->
+    <div class="left-panel">
+      <div class="left-panel-scroll">
+
+        <!-- Processes -->
+        <div class="section-label">Processes</div>
+        <div id="process-list"></div>
+
+        <button class="add-process-btn" onclick="addProcess()">＋ Add Process</button>
+
+        <!-- Presets -->
+        <div class="section-label">Presets</div>
+        <div class="presets-grid">
+          <button class="preset-btn" onclick="loadPreset('classic')"><strong>Classic 3P</strong>Textbook example</button>
+          <button class="preset-btn" onclick="loadPreset('io_heavy')"><strong>IO-Heavy</strong>Long IO waits</button>
+          <button class="preset-btn" onclick="loadPreset('starvation')"><strong>Starvation</strong>Priority trap</button>
+          <button class="preset-btn" onclick="loadPreset('burst')"><strong>CPU-Burst</strong>No IO</button>
+        </div>
+
+        <!-- Algorithm -->
+        <div class="section-label">Algorithm</div>
+        <div id="algo-list"></div>
+
+        <!-- Error -->
+        <div id="error-banner" style="display:none" class="error-banner"></div>
+      </div>
+
+      <div class="left-panel-footer">
+        <button class="run-btn" id="run-btn" onclick="runSimulation()">
+          <span id="run-btn-inner">▶  Run Simulation</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Canvas -->
+    <div class="main-canvas">
+
+      <!-- Tabs -->
+      <div class="view-tabs" id="view-tabs" style="display:none">
+        <button class="view-tab active" onclick="setView('gantt')">Gantt Chart</button>
+        <button class="view-tab" onclick="setView('live')">Live Simulation</button>
+        <button class="view-tab" onclick="setView('metrics')">Metrics</button>
+      </div>
+
+      <!-- Compare Tabs -->
+      <div class="view-tabs" id="compare-tabs" style="display:none">
+        <button class="view-tab active" onclick="setView('compare')">Compare Results</button>
+      </div>
+
+      <!-- Playback Bar -->
+      <div class="playback-bar" id="playback-bar" style="display:none">
+        <button class="pb-btn" id="pb-reset" onclick="seekTo(0)" title="Reset">↺</button>
+        <button class="pb-btn" id="pb-back" onclick="stepBack()" title="Step Back">←</button>
+        <button class="pb-btn" id="pb-play" onclick="togglePlay()" title="Play/Pause">▶</button>
+        <button class="pb-btn" id="pb-fwd" onclick="stepForward()" title="Step Forward">→</button>
+        <div class="pb-time mono"><span id="pb-time-display">t = 0</span></div>
+        <input class="pb-scrubber" type="range" id="pb-scrubber" min="0" value="0" oninput="seekTo(+this.value)">
+        <select class="speed-select" onchange="setSpeed(+this.value)">
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+          <option value="4">4×</option>
+        </select>
+      </div>
+
+      <!-- View Content -->
+      <div class="view-content" id="view-content">
+        <div class="empty-state" id="empty-state">
+          <div class="empty-icon">⏱</div>
+          <div class="empty-title">Ready to simulate</div>
+          <div class="empty-sub">Configure processes, pick an algorithm, and click Run.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tooltip -->
+<div class="tooltip" id="tooltip" style="display:none">
+  <div class="tooltip-header" id="tooltip-header"></div>
+  <div id="tooltip-body"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════
+
+const COLORS = ['#4F8EF7','#9B6DFF','#2DD4BF','#F59E0B','#F472B6','#22C55E','#FB923C','#A78BFA'];
+
+const ALGORITHMS = [
+  { id: 'FCFS',        name: 'First Come First Served', badge: 'Non-preemptive', needsQ: false, needsPri: false },
+  { id: 'SJF',         name: 'Shortest Job First',       badge: 'Non-preemptive', needsQ: false, needsPri: false },
+  { id: 'SRTF',        name: 'Shortest Remaining Time',  badge: 'Preemptive',     needsQ: false, needsPri: false },
+  { id: 'RR',          name: 'Round Robin',               badge: 'Quantum',        needsQ: true,  needsPri: false },
+  { id: 'Priority_NP', name: 'Priority Non-Preemptive',  badge: 'Priority',       needsQ: false, needsPri: true  },
+  { id: 'Priority_P',  name: 'Priority Preemptive',       badge: 'Priority',       needsQ: false, needsPri: true  },
+];
+
+const PRESETS = {
+  classic: {
+    processes: [
+      { pid:'P1', arrival_time:0, priority:3, bursts:[{type:'CPU',duration:5},{type:'IO',duration:3},{type:'CPU',duration:4}] },
+      { pid:'P2', arrival_time:1, priority:1, bursts:[{type:'CPU',duration:3},{type:'IO',duration:2},{type:'CPU',duration:2}] },
+      { pid:'P3', arrival_time:2, priority:2, bursts:[{type:'CPU',duration:2},{type:'IO',duration:1},{type:'CPU',duration:3}] },
+    ]
+  },
+  io_heavy: {
+    processes: [
+      { pid:'P1', arrival_time:0, priority:2, bursts:[{type:'CPU',duration:2},{type:'IO',duration:8},{type:'CPU',duration:2}] },
+      { pid:'P2', arrival_time:0, priority:1, bursts:[{type:'CPU',duration:2},{type:'IO',duration:8},{type:'CPU',duration:2}] },
+      { pid:'P3', arrival_time:1, priority:3, bursts:[{type:'CPU',duration:3},{type:'IO',duration:6},{type:'CPU',duration:3}] },
+    ]
+  },
+  starvation: {
+    processes: [
+      { pid:'P1', arrival_time:0, priority:1, bursts:[{type:'CPU',duration:10}] },
+      { pid:'P2', arrival_time:1, priority:1, bursts:[{type:'CPU',duration:8}]  },
+      { pid:'P3', arrival_time:2, priority:1, bursts:[{type:'CPU',duration:6}]  },
+      { pid:'P4', arrival_time:0, priority:5, bursts:[{type:'CPU',duration:12}] },
+    ]
+  },
+  burst: {
+    processes: [
+      { pid:'P1', arrival_time:0, priority:3, bursts:[{type:'CPU',duration:8}] },
+      { pid:'P2', arrival_time:2, priority:1, bursts:[{type:'CPU',duration:4}] },
+      { pid:'P3', arrival_time:4, priority:2, bursts:[{type:'CPU',duration:6}] },
+      { pid:'P4', arrival_time:5, priority:4, bursts:[{type:'CPU',duration:2}] },
+    ]
+  }
+};
+
+let state = {
+  processes: JSON.parse(JSON.stringify(PRESETS.classic.processes)),
+  algorithm: 'FCFS',
+  quantum: 2,
+  result: null,
+  compareResults: [],
+  currentTime: 0,
+  totalTime: 0,
+  isPlaying: false,
+  playSpeed: 1,
+  playInterval: null,
+  view: 'gantt',
+  mode: 'single',
+  expandedPid: null,
+  loading: false,
+  selectedAlgos: ['FCFS','SJF','SRTF','RR'],
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER: Process List
+// ═══════════════════════════════════════════════════════════════════
+
+function renderProcessList() {
+  const el = document.getElementById('process-list');
+  el.innerHTML = '';
+  state.processes.forEach((proc, idx) => {
+    const color = COLORS[idx % COLORS.length];
+    const expanded = state.expandedPid === proc.pid;
+    const card = document.createElement('div');
+    card.className = 'process-card' + (expanded ? ' expanded' : '');
+
+    const burstPreview = proc.bursts.map(b =>
+      `<span class="burst-chip ${b.type.toLowerCase()}">${b.type[0]}${b.duration}</span>`
+    ).join('');
+
+    let bodyHTML = '';
+    if (expanded) {
+      const needsPriority = ['Priority_NP','Priority_P'].includes(state.algorithm);
+      bodyHTML = `<div class="process-body">
+        <div class="input-row">
+          <div class="input-group">
+            <label>Arrival</label>
+            <input class="input-field" type="number" min="0" value="${proc.arrival_time}"
+              onchange="updateProc('${proc.pid}','arrival_time',+this.value)">
+          </div>
+          ${needsPriority ? `<div class="input-group">
+            <label>Priority</label>
+            <input class="input-field" type="number" min="1" value="${proc.priority}"
+              onchange="updateProc('${proc.pid}','priority',+this.value)">
+          </div>` : ''}
+        </div>
+        <div style="margin-bottom:6px"><label>Bursts</label></div>
+        <div class="bursts-row" id="bursts-${proc.pid}">
+          ${proc.bursts.map((b,bi) => `
+            <div class="burst-edit-chip ${b.type.toLowerCase()}">
+              <span>${b.type}</span>
+              <input class="burst-duration-input" type="number" min="1" value="${b.duration}"
+                onchange="updateBurst('${proc.pid}',${bi},+this.value)">
+              <button class="burst-remove" onclick="removeBurst('${proc.pid}',${bi})">×</button>
+            </div>
+          `).join('')}
+          <button class="add-burst-btn" onclick="addBurst('${proc.pid}','CPU')">+ CPU</button>
+          <button class="add-burst-btn" onclick="addBurst('${proc.pid}','IO')">+ IO</button>
+        </div>
+      </div>`;
+    }
+
+    card.innerHTML = `
+      <div class="process-header" onclick="toggleExpand('${proc.pid}')">
+        <div class="process-dot" style="background:${color};box-shadow:0 0 6px ${color}40"></div>
+        <span class="process-pid" style="color:${color}">${proc.pid}</span>
+        <div class="process-bursts-preview">${burstPreview}</div>
+        <button class="btn-remove" onclick="event.stopPropagation();removeProcess('${proc.pid}')">×</button>
+      </div>
+      ${bodyHTML}
+    `;
+    el.appendChild(card);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER: Algorithm Selector
+// ═══════════════════════════════════════════════════════════════════
+
+function renderAlgoList() {
+  const el = document.getElementById('algo-list');
+  el.innerHTML = '';
+  ALGORITHMS.forEach(algo => {
+    const selected = state.algorithm === algo.id;
+    const div = document.createElement('div');
+    div.className = 'algo-option' + (selected ? ' selected' : '');
+    div.onclick = () => { state.algorithm = algo.id; renderAlgoList(); renderProcessList(); updateAlgoBadge(); };
+    div.innerHTML = `
+      <div class="algo-radio"><div class="algo-radio-inner"></div></div>
+      <span class="algo-name">${algo.name}</span>
+      <span class="algo-badge">${algo.badge}</span>
+    `;
+    el.appendChild(div);
+
+    if (selected && algo.needsQ) {
+      const qrow = document.createElement('div');
+      qrow.className = 'quantum-row';
+      qrow.innerHTML = `
+        <span class="quantum-label">Quantum:</span>
+        <input class="quantum-input" type="number" min="1" value="${state.quantum}"
+          onchange="state.quantum=+this.value">
+      `;
+      el.appendChild(qrow);
+    }
+  });
+}
+
+function updateAlgoBadge() {
+  const algo = ALGORITHMS.find(a => a.id === state.algorithm);
+  document.getElementById('algo-badge').textContent = algo ? algo.name : '';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PROCESS MUTATIONS
+// ═══════════════════════════════════════════════════════════════════
+
+function addProcess() {
+  const n = state.processes.length + 1;
+  state.processes.push({ pid:`P${n}`, arrival_time:0, priority:n, bursts:[{type:'CPU',duration:3}] });
+  renderProcessList();
+}
+
+function removeProcess(pid) {
+  state.processes = state.processes.filter(p => p.pid !== pid);
+  renderProcessList();
+}
+
+function updateProc(pid, field, value) {
+  const p = state.processes.find(p => p.pid === pid);
+  if (p) p[field] = value;
+}
+
+function addBurst(pid, type) {
+  const p = state.processes.find(p => p.pid === pid);
+  if (p) { p.bursts.push({ type, duration: type === 'CPU' ? 3 : 2 }); renderProcessList(); }
+}
+
+function removeBurst(pid, index) {
+  const p = state.processes.find(p => p.pid === pid);
+  if (p && p.bursts.length > 1) { p.bursts.splice(index, 1); renderProcessList(); }
+}
+
+function updateBurst(pid, index, duration) {
+  const p = state.processes.find(p => p.pid === pid);
+  if (p && p.bursts[index]) p.bursts[index].duration = Math.max(1, duration);
+}
+
+function toggleExpand(pid) {
+  state.expandedPid = state.expandedPid === pid ? null : pid;
+  renderProcessList();
+}
+
+function loadPreset(id) {
+  const preset = PRESETS[id];
+  if (preset) {
+    state.processes = JSON.parse(JSON.stringify(preset.processes));
+    state.expandedPid = null;
+    renderProcessList();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SIMULATION — Talk to Go API (or use mock in demo mode)
+// ═══════════════════════════════════════════════════════════════════
+
+async function runSimulation() {
+  if (state.loading) return;
+  hideError();
+  setLoading(true);
+
+  try {
+    const body = {
+      processes: state.processes,
+      algorithm: state.algorithm,
+      quantum: state.quantum,
+    };
+
+    let result;
+    try {
+      const res = await fetch('http://localhost:8080/api/simulate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      result = await res.json();
+    } catch (_) {
+      // Backend not running — use client-side simulation for demo
+      result = clientSimulate(state.processes, state.algorithm, state.quantum);
+    }
+
+    state.result = result;
+    state.totalTime = result.total_time;
+    state.currentTime = 0;
+    state.view = 'gantt';
+
+    document.getElementById('view-tabs').style.display = state.mode === 'single' ? 'flex' : 'none';
+    document.getElementById('playback-bar').style.display = 'flex';
+    document.getElementById('pb-scrubber').max = state.totalTime;
+    updateAlgoBadge();
+    renderView();
+    autoPlay();
+
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CLIENT-SIDE SIMULATION ENGINE (fallback when backend not running)
+// ═══════════════════════════════════════════════════════════════════
+
+function clientSimulate(processes, algorithm, quantum) {
+  // Deep copy
+  const procs = processes.map(p => ({
+    ...p,
+    bursts: p.bursts.map(b => ({...b})),
+    currentBurstIdx: 0,
+    remainingBurst: p.bursts[0]?.duration ?? 0,
+    state: 'NEW',
+    started: false,
+    completed: false,
+    startTime: 0,
+    completionTime: 0,
+    waitingTime: 0,
+    turnaroundTime: 0,
+    responseTime: 0,
+  }));
+
+  let timeline = [];
+  let time = 0;
+  let running = null;
+  let readyQueue = [];
+  let ioQueue = [];
+  let completed = 0;
+  let cpuBusy = 0;
+  let quantumUsed = 0;
+  const MAX_TIME = 1000;
+
+  function enqueueReady(p) {
+    if (!p || p.completed || readyQueue.includes(p)) return;
+    p.state = 'READY';
+    readyQueue.push(p);
+  }
+
+  function selectNext() {
+    if (readyQueue.length === 0) return null;
+    if (algorithm === 'FCFS' || algorithm === 'RR') return readyQueue[0];
+    if (algorithm === 'SJF' || algorithm === 'SRTF')
+      return readyQueue.reduce((best, p) => p.remainingBurst < best.remainingBurst ? p : best);
+    if (algorithm === 'Priority_NP' || algorithm === 'Priority_P')
+      return readyQueue.reduce((best, p) => p.priority < best.priority ? p : best);
+    return readyQueue[0];
+  }
+
+  while (completed < procs.length && time < MAX_TIME) {
+    // Arrivals
+    for (const p of procs) {
+      if (p.state === 'NEW' && p.arrival_time <= time) {
+        p.currentBurstIdx = 0;
+        p.remainingBurst = p.bursts[0].duration;
+        enqueueReady(p);
+      }
+    }
+
+    // IO completion
+    const stillIO = [];
+    for (const entry of ioQueue) {
+      if (entry.finishAt <= time) {
+        const p = entry.proc;
+        p.currentBurstIdx++;
+        if (p.currentBurstIdx < p.bursts.length) {
+          p.remainingBurst = p.bursts[p.currentBurstIdx].duration;
+          enqueueReady(p);
+        } else {
+          p.completed = true; p.completionTime = time; p.state = 'TERMINATED'; completed++;
+        }
+      } else { stillIO.push(entry); }
+    }
+    ioQueue = stillIO;
+
+    // Preemption
+    if (running && (algorithm === 'SRTF' || algorithm === 'Priority_P')) {
+      const best = selectNext();
+      if (best) {
+        const shouldPreempt = algorithm === 'SRTF'
+          ? best.remainingBurst < running.remainingBurst
+          : best.priority < running.priority;
+        if (shouldPreempt) {
+          readyQueue.splice(readyQueue.indexOf(best), 1);
+          enqueueReady(running);
+          running.state = 'READY';
+          running = best;
+          running.state = 'RUNNING';
+          quantumUsed = 0;
+        }
+      }
+    }
+
+    // Select next
+    if (!running) {
+      const next = selectNext();
+      if (next) {
+        readyQueue.splice(readyQueue.indexOf(next), 1);
+        running = next;
+        running.state = 'RUNNING';
+        if (!running.started) { running.started = true; running.startTime = time; running.responseTime = time - running.arrival_time; }
+        quantumUsed = 0;
+      }
+    }
+
+    // Execute
+    if (running) {
+      timeline.push({ time, process_id: running.pid, event: 'RUNNING' });
+      running.remainingBurst--;
+      quantumUsed++;
+      cpuBusy++;
+
+      if (running.remainingBurst === 0) {
+        running.currentBurstIdx++;
+        if (running.currentBurstIdx >= running.bursts.length) {
+          running.completed = true; running.completionTime = time + 1; running.state = 'TERMINATED'; completed++;
+        } else {
+          const nb = running.bursts[running.currentBurstIdx];
+          if (nb.type === 'IO') {
+            running.state = 'WAITING';
+            ioQueue.push({ proc: running, finishAt: time + 1 + nb.duration });
+          } else {
+            running.remainingBurst = nb.duration; enqueueReady(running);
+          }
+        }
+        running = null; quantumUsed = 0;
+      } else if (algorithm === 'RR' && quantumUsed >= quantum) {
+        enqueueReady(running); running.state = 'READY'; running = null; quantumUsed = 0;
+      }
+    } else {
+      timeline.push({ time, process_id: 'IDLE', event: 'IDLE' });
+    }
+
+    time++;
+  }
+
+  // Compact timeline
+  const compacted = timeline.length ? [timeline[0]] : [];
+  for (let i = 1; i < timeline.length; i++) {
+    const last = compacted[compacted.length - 1];
+    if (last.process_id !== timeline[i].process_id) compacted.push(timeline[i]);
+  }
+
+  // Compute metrics
+  let totalWait = 0, totalTAT = 0, totalResp = 0;
+  const procResults = procs.map(p => {
+    const totalBurst = p.bursts.reduce((s, b) => s + b.duration, 0);
+    p.turnaroundTime = p.completionTime - p.arrival_time;
+    p.waitingTime = p.turnaroundTime - totalBurst;
+    totalWait += p.waitingTime; totalTAT += p.turnaroundTime; totalResp += p.responseTime;
+    return {
+      pid: p.pid, arrival_time: p.arrival_time, priority: p.priority,
+      bursts: p.bursts, start_time: p.startTime, completion_time: p.completionTime,
+      waiting_time: p.waitingTime, turnaround_time: p.turnaroundTime,
+      response_time: p.responseTime, started: p.started, completed: p.completed,
+    };
+  });
+
+  const n = procs.length;
+  return {
+    algorithm, timeline: compacted, processes: procResults,
+    total_time: time, cpu_utilization: cpuBusy / time * 100,
+    average_waiting_time: totalWait / n,
+    average_turnaround_time: totalTAT / n,
+    average_response_time: totalResp / n,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// VIEW RENDERING
+// ═══════════════════════════════════════════════════════════════════
+
+function setView(v) {
+  state.view = v;
+  document.querySelectorAll('.view-tab').forEach(t => {
+    t.classList.toggle('active', t.textContent.toLowerCase().includes(v.replace('_',' ').split(' ')[0].toLowerCase()));
+  });
+  renderView();
+}
+
+function renderView() {
+  const content = document.getElementById('view-content');
+  document.getElementById('empty-state')?.remove();
+
+  if (state.mode === 'compare') {
+    content.innerHTML = '';
+    content.appendChild(buildCompareView());
+    return;
+  }
+
+  if (!state.result) {
+    content.innerHTML = `<div class="empty-state" id="empty-state">
+      <div class="empty-icon">⏱</div>
+      <div class="empty-title">Ready to simulate</div>
+      <div class="empty-sub">Configure processes, pick an algorithm, and click Run.</div>
+    </div>`;
+    return;
+  }
+
+  content.innerHTML = '';
+  if (state.view === 'gantt')   content.appendChild(buildGanttView());
+  if (state.view === 'live')    content.appendChild(buildLiveView());
+  if (state.view === 'metrics') content.appendChild(buildMetricsView());
+}
+
+// ─── Gantt View ──────────────────────────────────────────────────────
+
+function buildGanttView() {
+  const result = state.result;
+  const { timeline, total_time, processes } = result;
+  const t = state.currentTime;
+  const wrap = document.createElement('div');
+  wrap.className = 'gantt-view fade-in';
+
+  const container = document.createElement('div');
+  container.className = 'gantt-container';
+
+  // Build segments
+  const segments = [];
+  for (let i = 0; i < timeline.length; i++) {
+    const end = i + 1 < timeline.length ? timeline[i+1].time : total_time;
+    segments.push({ pid: timeline[i].process_id, start: timeline[i].time, end });
+  }
+
+  const pidColors = {};
+  processes.forEach((p, i) => { pidColors[p.pid] = COLORS[i % COLORS.length]; });
+
+  const tracksWrap = document.createElement('div');
+  tracksWrap.className = 'gantt-tracks-wrap';
+  tracksWrap.style.paddingBottom = '24px';
+
+  const pxPerUnit = Math.max(18, Math.min(40, 700 / total_time));
+
+  // Cursor
+  const cursor = document.createElement('div');
+  cursor.className = 'gantt-cursor';
+  cursor.style.cssText = `left:${50 + t * pxPerUnit}px; top:0; bottom:0; height:100%;`;
+  tracksWrap.appendChild(cursor);
+
+  // Per-process rows
+  processes.forEach(proc => {
+    const row = document.createElement('div');
+    row.className = 'gantt-row';
+    const lbl = document.createElement('div');
+    lbl.className = 'gantt-label';
+    lbl.textContent = proc.pid;
+    lbl.style.color = pidColors[proc.pid];
+    row.appendChild(lbl);
+
+    const track = document.createElement('div');
+    track.className = 'gantt-track';
+    track.style.width = (total_time * pxPerUnit) + 'px';
+
+    segments.filter(s => s.pid === proc.pid).forEach(seg => {
+      const bar = document.createElement('div');
+      bar.className = 'gantt-seg' + (seg.start >= t ? ' future' : '');
+      bar.style.cssText = `left:${seg.start*pxPerUnit}px; width:${(seg.end-seg.start)*pxPerUnit - 1}px; background:${pidColors[proc.pid]}; opacity:${seg.start >= t ? 0.2 : 0.9};`;
+      bar.title = `${proc.pid}: t=${seg.start}–${seg.end}`;
+      bar.addEventListener('mouseenter', (e) => showTooltip(e, seg, result));
+      bar.addEventListener('mousemove', (e) => moveTooltip(e));
+      bar.addEventListener('mouseleave', () => hideTooltip());
+      track.appendChild(bar);
+    });
+
+    row.appendChild(track);
+    tracksWrap.appendChild(row);
+  });
+
+  // CPU timeline row
+  const cpuRow = document.createElement('div');
+  cpuRow.className = 'gantt-row';
+  cpuRow.style.marginTop = '8px';
+  const cpuLbl = document.createElement('div');
+  cpuLbl.className = 'cpu-row-label';
+  cpuLbl.textContent = 'CPU';
+  cpuRow.appendChild(cpuLbl);
+  const cpuTrack = document.createElement('div');
+  cpuTrack.className = 'gantt-track';
+  cpuTrack.style.cssText = `width:${total_time*pxPerUnit}px; height:22px;`;
+
+  segments.forEach(seg => {
+    const bar = document.createElement('div');
+    bar.className = 'gantt-seg' + (seg.pid === 'IDLE' ? ' idle' : '');
+    bar.style.cssText = `left:${seg.start*pxPerUnit}px; width:${(seg.end-seg.start)*pxPerUnit - 1}px; ${seg.pid !== 'IDLE' ? `background:${pidColors[seg.pid]};` : ''} font-size:9px;`;
+    bar.textContent = seg.pid !== 'IDLE' ? seg.pid : '—';
+    bar.addEventListener('mouseenter', (e) => showTooltip(e, seg, result));
+    bar.addEventListener('mousemove', (e) => moveTooltip(e));
+    bar.addEventListener('mouseleave', () => hideTooltip());
+    cpuTrack.appendChild(bar);
+  });
+
+  cpuRow.appendChild(cpuTrack);
+  tracksWrap.appendChild(cpuRow);
+
+  // Time axis
+  const axis = document.createElement('div');
+  axis.className = 'gantt-axis';
+  axis.style.marginLeft = '50px';
+  const tickCount = Math.min(total_time, 20);
+  const tickStep = Math.ceil(total_time / tickCount);
+  for (let ti = 0; ti <= total_time; ti += tickStep) {
+    const tick = document.createElement('div');
+    tick.className = 'gantt-tick';
+    tick.style.left = (ti * pxPerUnit) + 'px';
+    tick.textContent = ti;
+    axis.appendChild(tick);
+  }
+
+  container.appendChild(tracksWrap);
+  container.appendChild(axis);
+  wrap.appendChild(container);
+  return wrap;
+}
+
+// ─── Live View ────────────────────────────────────────────────────────
+
+function buildLiveView() {
+  const result = state.result;
+  const t = state.currentTime;
+  const { timeline, total_time, processes } = result;
+
+  const pidColors = {};
+  processes.forEach((p, i) => { pidColors[p.pid] = COLORS[i % COLORS.length]; });
+
+  // Determine running process at time t
+  let runningPid = null;
+  for (let i = timeline.length - 1; i >= 0; i--) {
+    if (timeline[i].time <= t) {
+      runningPid = timeline[i].process_id === 'IDLE' ? null : timeline[i].process_id;
+      break;
+    }
+  }
+
+  // Determine queues
+  const ready = [];
+  const io = [];
+  const done = [];
+  for (const proc of processes) {
+    if (proc.arrival_time > t) continue;
+    if (proc.completion_time <= t) { done.push(proc.pid); continue; }
+    if (proc.pid === runningPid) continue;
+    // Simple heuristic: if no CPU timeline entry near this time, might be in IO
+    const inIO = isInIO(proc, t, timeline, total_time);
+    if (inIO) io.push(proc.pid);
+    else ready.push(proc.pid);
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'live-view fade-in';
+
+  // Grid: ready | cpu | io
+  wrap.innerHTML = `
+    <div class="live-grid">
+      <div class="queue-panel">
+        <div class="queue-title">Ready Queue</div>
+        <div class="queue-slots" id="live-ready">
+          ${ready.length ? ready.map(pid => `
+            <div class="queue-process-chip">
+              <div style="width:8px;height:8px;border-radius:50%;background:${pidColors[pid]};box-shadow:0 0 6px ${pidColors[pid]}60"></div>
+              <span style="color:${pidColors[pid]}">${pid}</span>
+            </div>
+          `).join('') : '<div class="queue-empty">Empty</div>'}
+        </div>
+      </div>
+
+      <div class="cpu-panel ${runningPid ? '' : 'idle'}">
+        <div class="cpu-title">CPU</div>
+        ${runningPid
+          ? `<div class="cpu-process" style="color:${pidColors[runningPid]}">${runningPid}</div>
+             <div style="font-size:10px;color:var(--text3)">t = ${t}</div>
+             <div class="cpu-burst-bar"><div class="cpu-burst-fill" style="width:60%;background:${pidColors[runningPid]}"></div></div>`
+          : `<div class="cpu-idle-text">IDLE</div>`
+        }
+      </div>
+
+      <div class="queue-panel">
+        <div class="queue-title">I/O Queue</div>
+        <div class="queue-slots">
+          ${io.length ? io.map(pid => `
+            <div class="queue-process-chip">
+              <div style="width:8px;height:8px;border-radius:50%;background:var(--teal);box-shadow:0 0 6px var(--teal)60"></div>
+              <span style="color:var(--teal)">${pid}</span>
+              <span style="color:var(--text3);font-size:9px;margin-left:auto">I/O</span>
+            </div>
+          `).join('') : '<div class="queue-empty">Empty</div>'}
+        </div>
+      </div>
+    </div>
+
+    <div class="event-log">
+      <div class="event-log-title">Event Log</div>
+      ${buildEventLog(t, timeline, pidColors, processes)}
+    </div>
+  `;
+
+  return wrap;
+}
+
+function isInIO(proc, t, timeline, totalTime) {
+  // If process has appeared in CPU timeline but not running now and not done
+  const cpuAppearances = timeline.filter(e => e.process_id === proc.pid);
+  if (cpuAppearances.length === 0) return false;
+  const lastCPU = cpuAppearances[cpuAppearances.length - 1];
+  const lastCPUEnd = (() => {
+    const idx = timeline.indexOf(lastCPU);
+    return idx + 1 < timeline.length ? timeline[idx+1].time : totalTime;
+  })();
+  if (lastCPUEnd > t) return false;
+  // After last CPU burst ended and not completed — likely in IO
+  return proc.completion_time > t;
+}
+
+function buildEventLog(t, timeline, pidColors, processes) {
+  const events = [];
+  for (let i = 0; i < timeline.length && timeline[i].time <= t; i++) {
+    const e = timeline[i];
+    const nextTime = i + 1 < timeline.length ? timeline[i+1].time : null;
+
+    if (e.process_id === 'IDLE') {
+      events.unshift(`<div class="event-entry"><span class="event-time">t=${e.time}</span><span>CPU idle</span></div>`);
+    } else {
+      const color = pidColors[e.process_id] || '#fff';
+      events.unshift(`<div class="event-entry"><span class="event-time">t=${e.time}</span><span style="color:${color}">${e.process_id}</span><span style="color:var(--text3)"> scheduled on CPU</span></div>`);
+    }
+  }
+  for (const proc of processes) {
+    if (proc.arrival_time <= t) {
+      events.push(`<div class="event-entry" style="opacity:0.5"><span class="event-time">t=${proc.arrival_time}</span><span style="color:${pidColors[proc.pid]}">${proc.pid}</span><span style="color:var(--text3)"> arrived</span></div>`);
+    }
+  }
+  return events.slice(0, 8).join('');
+}
+
+// ─── Metrics View ──────────────────────────────────────────────────────
+
+function buildMetricsView() {
+  const r = state.result;
+  const wrap = document.createElement('div');
+  wrap.className = 'metrics-view fade-in';
+
+  const algo = ALGORITHMS.find(a => a.id === state.algorithm);
+
+  wrap.innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">CPU Utilization</div>
+        <div class="kpi-value" style="color:var(--blue)">${r.cpu_utilization.toFixed(1)}%</div>
+        <div class="kpi-sub">${algo?.name ?? state.algorithm}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Avg Waiting Time</div>
+        <div class="kpi-value" style="color:var(--purple)">${r.average_waiting_time.toFixed(2)}</div>
+        <div class="kpi-sub">time units</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Avg Turnaround</div>
+        <div class="kpi-value" style="color:var(--teal)">${r.average_turnaround_time.toFixed(2)}</div>
+        <div class="kpi-sub">time units</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Avg Response Time</div>
+        <div class="kpi-value" style="color:var(--amber)">${r.average_response_time.toFixed(2)}</div>
+        <div class="kpi-sub">time units</div>
+      </div>
+    </div>
+    <div class="metrics-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Process</th>
+            <th>Arrival</th>
+            <th>Start</th>
+            <th>Completion</th>
+            <th>Waiting</th>
+            <th>Turnaround</th>
+            <th>Response</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${r.processes.map((p, i) => `
+            <tr>
+              <td style="color:${COLORS[i%COLORS.length]};font-weight:700">${p.pid}</td>
+              <td>${p.arrival_time}</td>
+              <td>${p.start_time}</td>
+              <td>${p.completion_time}</td>
+              <td>${p.waiting_time}</td>
+              <td>${p.turnaround_time}</td>
+              <td>${p.response_time}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+  return wrap;
+}
+
+// ─── Compare View ──────────────────────────────────────────────────────
+
+function buildCompareView() {
+  const wrap = document.createElement('div');
+  wrap.className = 'compare-view fade-in';
+
+  const picker = `<div class="compare-algo-picker">
+    ${ALGORITHMS.map(a => `
+      <button class="algo-pill ${state.selectedAlgos.includes(a.id) ? 'selected' : ''}"
+        onclick="toggleCompareAlgo('${a.id}')">${a.name}</button>
+    `).join('')}
+  </div>`;
+
+  let results = state.compareResults;
+
+  const chartsHTML = results.length === 0
+    ? `<div class="empty-state" style="flex:1;min-height:200px">
+        <div class="empty-icon">📊</div>
+        <div class="empty-title">Click Compare to run all algorithms</div>
+        <div class="empty-sub">Results will appear here.</div>
+      </div>`
+    : buildCompareCharts(results);
+
+  wrap.innerHTML = `
+    ${picker}
+    <button class="compare-run-btn" onclick="runCompare()">
+      <span id="compare-spinner" style="display:none" class="spinner"></span>
+      Compare Selected
+    </button>
+    ${chartsHTML}
+  `;
+  return wrap;
+}
+
+function buildCompareCharts(results) {
+  const algoColors = { FCFS:'#4F8EF7', SJF:'#9B6DFF', SRTF:'#2DD4BF', RR:'#F59E0B', Priority_NP:'#F472B6', Priority_P:'#22C55E' };
+  const maxWait = Math.max(...results.map(r => r.average_waiting_time), 1);
+  const maxTAT  = Math.max(...results.map(r => r.average_turnaround_time), 1);
+  const maxResp = Math.max(...results.map(r => r.average_response_time), 1);
+  const maxCPU  = 100;
+
+  const sorted = [...results].sort((a,b) => a.average_waiting_time - b.average_waiting_time);
+  const medals = ['🥇','🥈','🥉'];
+
+  const algoName = id => ALGORITHMS.find(a => a.id === id)?.name ?? id;
+
+  return `
+    <div class="compare-charts">
+      <div class="chart-card">
+        <div class="chart-title">Avg Waiting Time (lower is better)</div>
+        <div class="bar-chart">
+          ${results.map(r => `
+            <div class="bar-row">
+              <span class="bar-algo-name">${r.algorithm.replace('_',' ')}</span>
+              <div class="bar-track">
+                <div class="bar-fill" style="width:${r.average_waiting_time/maxWait*100}%;background:${algoColors[r.algorithm] ?? '#4F8EF7'}"></div>
+              </div>
+              <span class="bar-value">${r.average_waiting_time.toFixed(1)}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Avg Turnaround Time (lower is better)</div>
+        <div class="bar-chart">
+          ${results.map(r => `
+            <div class="bar-row">
+              <span class="bar-algo-name">${r.algorithm.replace('_',' ')}</span>
+              <div class="bar-track">
+                <div class="bar-fill" style="width:${r.average_turnaround_time/maxTAT*100}%;background:${algoColors[r.algorithm] ?? '#4F8EF7'}"></div>
+              </div>
+              <span class="bar-value">${r.average_turnaround_time.toFixed(1)}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Avg Response Time</div>
+        <div class="bar-chart">
+          ${results.map(r => `
+            <div class="bar-row">
+              <span class="bar-algo-name">${r.algorithm.replace('_',' ')}</span>
+              <div class="bar-track">
+                <div class="bar-fill" style="width:${r.average_response_time/maxResp*100}%;background:${algoColors[r.algorithm] ?? '#4F8EF7'}"></div>
+              </div>
+              <span class="bar-value">${r.average_response_time.toFixed(1)}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">CPU Utilization (higher is better)</div>
+        <div class="bar-chart">
+          ${results.map(r => `
+            <div class="bar-row">
+              <span class="bar-algo-name">${r.algorithm.replace('_',' ')}</span>
+              <div class="bar-track">
+                <div class="bar-fill" style="width:${r.cpu_utilization}%;background:${algoColors[r.algorithm] ?? '#4F8EF7'}"></div>
+              </div>
+              <span class="bar-value">${r.cpu_utilization.toFixed(0)}%</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="ranking-card">
+        <div class="chart-title">Ranking by Average Waiting Time</div>
+        ${sorted.map((r, i) => `
+          <div class="rank-row">
+            <span class="rank-medal">${medals[i] ?? `${i+1}.`}</span>
+            <span class="rank-name" style="color:${algoColors[r.algorithm] ?? '#fff'}">${algoName(r.algorithm)}</span>
+            <span class="rank-stat">wait: ${r.average_waiting_time.toFixed(2)} · tat: ${r.average_turnaround_time.toFixed(2)} · cpu: ${r.cpu_utilization.toFixed(0)}%</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// COMPARE
+// ═══════════════════════════════════════════════════════════════════
+
+function toggleCompareAlgo(id) {
+  const idx = state.selectedAlgos.indexOf(id);
+  if (idx >= 0) { if (state.selectedAlgos.length > 1) state.selectedAlgos.splice(idx, 1); }
+  else state.selectedAlgos.push(id);
+  renderView();
+}
+
+async function runCompare() {
+  const btn = document.querySelector('.compare-run-btn');
+  if (btn) btn.disabled = true;
+  state.compareResults = [];
+
+  try {
+    let results;
+    try {
+      const res = await fetch('http://localhost:8080/api/compare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ processes: state.processes, algorithms: state.selectedAlgos, quantum: state.quantum }),
+      });
+      results = (await res.json()).results;
+    } catch (_) {
+      // Client-side fallback
+      results = state.selectedAlgos.map(id => clientSimulate(state.processes, id, state.quantum));
+    }
+    state.compareResults = results;
+  } finally {
+    if (btn) btn.disabled = false;
+    renderView();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PLAYBACK
+// ═══════════════════════════════════════════════════════════════════
+
+function togglePlay() {
+  if (state.isPlaying) stopPlay(); else startPlay();
+}
+
+function startPlay() {
+  if (state.currentTime >= state.totalTime) state.currentTime = 0;
+  state.isPlaying = true;
+  document.getElementById('pb-play').textContent = '⏸';
+  document.getElementById('pb-play').classList.add('active');
+
+  state.playInterval = setInterval(() => {
+    if (state.currentTime >= state.totalTime) { stopPlay(); return; }
+    state.currentTime++;
+    updatePlaybackUI();
+    renderView();
+  }, 600 / state.playSpeed);
+}
+
+function stopPlay() {
+  state.isPlaying = false;
+  clearInterval(state.playInterval);
+  document.getElementById('pb-play').textContent = '▶';
+  document.getElementById('pb-play').classList.remove('active');
+}
+
+function autoPlay() {
+  setTimeout(() => startPlay(), 300);
+}
+
+function seekTo(t) {
+  stopPlay();
+  state.currentTime = Math.max(0, Math.min(+t, state.totalTime));
+  updatePlaybackUI();
+  renderView();
+}
+
+function stepForward() { seekTo(state.currentTime + 1); }
+function stepBack()    { seekTo(state.currentTime - 1); }
+
+function setSpeed(v) {
+  state.playSpeed = v;
+  if (state.isPlaying) { stopPlay(); startPlay(); }
+}
+
+function updatePlaybackUI() {
+  document.getElementById('pb-time-display').textContent = `t = ${state.currentTime} / ${state.totalTime}`;
+  document.getElementById('pb-scrubber').value = state.currentTime;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MODE
+// ═══════════════════════════════════════════════════════════════════
+
+function setMode(m) {
+  state.mode = m;
+  document.getElementById('mode-single').classList.toggle('active', m === 'single');
+  document.getElementById('mode-compare').classList.toggle('active', m === 'compare');
+  document.getElementById('view-tabs').style.display = m === 'single' && state.result ? 'flex' : 'none';
+  document.getElementById('compare-tabs').style.display = m === 'compare' ? 'flex' : 'none';
+  document.getElementById('playback-bar').style.display = m === 'single' && state.result ? 'flex' : 'none';
+  stopPlay();
+  renderView();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TOOLTIP
+// ═══════════════════════════════════════════════════════════════════
+
+function showTooltip(e, seg, result) {
+  const tt = document.getElementById('tooltip');
+  const header = document.getElementById('tooltip-header');
+  const body = document.getElementById('tooltip-body');
+  const algo = result.algorithm;
+
+  header.textContent = seg.isIdle ? 'CPU IDLE' : `${seg.pid}  t=${seg.start}–${seg.end}`;
+
+  let why = '';
+  if (seg.isIdle) {
+    why = 'CPU is idle — no processes are in the ready queue. All active processes are waiting on I/O.';
+  } else {
+    switch (algo) {
+      case 'FCFS': why = `${seg.pid} ran first because it arrived before all other ready processes (FCFS order).`; break;
+      case 'SJF': why = `${seg.pid} was selected for having the shortest next CPU burst among ready processes.`; break;
+      case 'Shortest_Remaining_Time_First': why = `${seg.pid} had the least remaining burst time at t=${seg.start}, so SRTF selected it.`; break;
+      case 'Round_Robin': why = `${seg.pid} received its time quantum at t=${seg.start}. Round Robin rotates fairly.`; break;
+      case 'Priority_Non_Preemptive': case 'Priority_Preemptive': {
+        const proc = result.processes.find(p => p.pid === seg.pid);
+        why = `${seg.pid} had the highest priority (value=${proc?.priority ?? '?'}) — lower value = higher priority.`;
+        break;
+      }
+      default: why = `${seg.pid} was scheduled at t=${seg.start}.`;
+    }
+  }
+  body.textContent = why;
+  tt.style.display = 'block';
+  moveTooltip(e);
+}
+
+function moveTooltip(e) {
+  const tt = document.getElementById('tooltip');
+  tt.style.left = (e.clientX + 12) + 'px';
+  tt.style.top  = (e.clientY - 10) + 'px';
+}
+
+function hideTooltip() {
+  document.getElementById('tooltip').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════════════════
+
+function setLoading(v) {
+  state.loading = v;
+  const btn = document.getElementById('run-btn');
+  const inner = document.getElementById('run-btn-inner');
+  btn.disabled = v;
+  inner.innerHTML = v ? '<div class="spinner"></div> Simulating…' : '▶  Run Simulation';
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-banner');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function hideError() {
+  document.getElementById('error-banner').style.display = 'none';
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+  if (e.code === 'ArrowRight') stepForward();
+  if (e.code === 'ArrowLeft')  stepBack();
+  if (e.code === 'KeyR') seekTo(0);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
+
+renderProcessList();
+renderAlgoList();
+updateAlgoBadge();
+// Auto-run on load for immediate wow factor
+runSimulation();
+</script>
+</body>
+</html>
